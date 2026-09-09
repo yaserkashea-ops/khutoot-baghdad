@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <base href="/khutoot-baghdad/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="خطوط بغداد — تنظيم إعلانات خطوط النقل المشترك في بغداد.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1E4D4A" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1615" media="(prefers-color-scheme: dark)">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- iOS / Android install -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="خطوط بغداد">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-512.png">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <title>خطوط بغداد</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #121824;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-text-size-adjust: 100%;
+      touch-action: manipulation;
+    }
+    /* Loading splash before Flutter boots */
+    .masarat-boot {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: #121824;
+      color: #EDE8E0;
+      font-family: system-ui, "Segoe UI", Tahoma, sans-serif;
+      z-index: 9999;
+      transition: opacity 0.25s ease;
+    }
+    .masarat-boot img {
+      width: 88px;
+      height: 88px;
+      border-radius: 18px;
+    }
+    .masarat-boot span {
+      font-size: 18px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="masarat-boot" id="masarat-boot">
+    <img src="icons/Icon-192.png" alt="خطوط بغداد">
+    <span id="masarat-boot-title">خطوط بغداد</span>
+  </div>
+
+  <script>
+    (function () {
+      var CACHE_BUST = 'v5';
+
+      // Soft reload once after deploy so phones pick up the new build (do NOT unregister SW).
+      try {
+        if (sessionStorage.getItem('masarat-cb') !== CACHE_BUST) {
+          sessionStorage.setItem('masarat-cb', CACHE_BUST);
+          var u = new URL(location.href);
+          u.searchParams.set('cb', CACHE_BUST);
+          location.replace(u.toString());
+          return;
+        }
+      } catch (e) {}
+
+      // Admin PWA start_url uses ?mode=admin (hash breaks installability on some browsers).
+      try {
+        var params = new URLSearchParams(location.search || '');
+        if (params.get('mode') === 'admin') {
+          var hash = (location.hash || '').replace(/^#/, '');
+          if (hash.indexOf('/admin') !== 0) {
+            location.replace(location.pathname + location.search + '#/admin');
+            return;
+          }
+        }
+      } catch (e) {}
+
+      function detectAdminRoute() {
+        var hash = (location.hash || '').replace(/^#/, '');
+        var params = new URLSearchParams(location.search || '');
+        return hash.indexOf('/admin') === 0
+          || params.get('mode') === 'admin'
+          || /(^|\/)admin(\/|$)/.test(location.pathname || '');
+      }
+
+      // Path /.../admin → hash route so Flutter opens the gate.
+      try {
+        if (/(^|\/)admin\/?$/.test(location.pathname || '') &&
+            (location.hash || '').replace(/^#/, '').indexOf('/admin') !== 0) {
+          var baseEl = document.querySelector('base');
+          var base = (baseEl && baseEl.getAttribute('href')) || '/';
+          if (base.charAt(base.length - 1) !== '/') base += '/';
+          location.replace(base + '?mode=admin#/admin');
+          return;
+        }
+      } catch (e) {}
+
+      function applyMode(isAdmin) {
+        var manifest = document.querySelector('link[rel="manifest"]');
+        if (manifest) {
+          var next = (isAdmin ? 'manifest-admin.json' : 'manifest.json') + '?m=' + (isAdmin ? 'admin' : 'app');
+          var current = manifest.getAttribute('href') || '';
+          if (current.indexOf(isAdmin ? 'manifest-admin.json' : 'manifest.json') === -1) {
+            manifest.setAttribute('href', next);
+          }
+        }
+        document.title = isAdmin ? 'لوحة تحكم خطوط بغداد' : 'خطوط بغداد';
+        var bootTitle = document.getElementById('masarat-boot-title');
+        if (bootTitle) bootTitle.textContent = isAdmin ? 'تحكم خطوط' : 'خطوط بغداد';
+        var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+        if (appleTitle) appleTitle.setAttribute('content', isAdmin ? 'تحكم خطوط' : 'خطوط بغداد');
+      }
+
+      applyMode(detectAdminRoute());
+
+      const api = {
+        deferred: null,
+        canInstall: false,
+        mode: detectAdminRoute() ? 'admin' : 'app',
+        isStandalone: function () {
+          // Only real home-screen install — do NOT treat minimal-ui (Chrome/Flutter web) as installed.
+          return window.matchMedia('(display-mode: standalone)').matches
+            || window.navigator.standalone === true;
+        },
+        isIos: function () {
+          const ua = window.navigator.userAgent || '';
+          return /iPad|iPhone|iPod/.test(ua)
+            || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        },
+        isMobile: function () {
+          return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
+            || (navigator.maxTouchPoints > 1 && window.innerWidth < 900);
+        },
+        setMode: function (mode) {
+          var isAdmin = mode === 'admin';
+          var next = isAdmin ? 'admin' : 'app';
+          if (api.mode === next) {
+            applyMode(isAdmin);
+            return;
+          }
+          api.mode = next;
+          applyMode(isAdmin);
+          // Only drop the prompt when switching manifests (app ↔ admin).
+          api.deferred = null;
+          api.canInstall = false;
+          window.dispatchEvent(new CustomEvent('masarat-install-state'));
+        },
+        ensureAdminHash: function () {
+          var hash = (location.hash || '').replace(/^#/, '');
+          if (hash.indexOf('/admin') === 0) return false;
+          location.hash = '/admin';
+          return true;
+        },
+        promptInstall: async function () {
+          if (!api.deferred) return 'unavailable';
+          api.deferred.prompt();
+          const choice = await api.deferred.userChoice;
+          api.deferred = null;
+          api.canInstall = false;
+          window.dispatchEvent(new CustomEvent('masarat-install-state'));
+          return choice.outcome;
+        },
+        waitForPrompt: function (ms) {
+          return new Promise(function (resolve) {
+            if (api.deferred) {
+              resolve(true);
+              return;
+            }
+            var done = false;
+            var timer = setTimeout(function () {
+              if (done) return;
+              done = true;
+              resolve(false);
+            }, ms || 2500);
+            function onState() {
+              if (done) return;
+              if (!api.deferred) return;
+              done = true;
+              clearTimeout(timer);
+              window.removeEventListener('masarat-install-state', onState);
+              resolve(true);
+            }
+            window.addEventListener('masarat-install-state', onState);
+          });
+        }
+      };
+      window.__masaratPwa = api;
+
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        api.deferred = e;
+        api.canInstall = true;
+        window.dispatchEvent(new CustomEvent('masarat-install-state'));
+      });
+
+      window.addEventListener('appinstalled', function () {
+        api.deferred = null;
+        api.canInstall = false;
+        window.dispatchEvent(new CustomEvent('masarat-install-state'));
+      });
+
+      // Register a real SW (Flutter's generated one currently unregisters itself).
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('sw.js?v=' + CACHE_BUST).catch(function () {});
+        });
+      }
+
+      // Hide boot splash once Flutter first frame paints (fallback timeout)
+      window.addEventListener('flutter-first-frame', function () {
+        const el = document.getElementById('masarat-boot');
+        if (!el) return;
+        el.style.opacity = '0';
+        setTimeout(function () { el.remove(); }, 280);
+      });
+      setTimeout(function () {
+        const el = document.getElementById('masarat-boot');
+        if (el) el.remove();
+      }, 8000);
+    })();
+  </script>
+
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
