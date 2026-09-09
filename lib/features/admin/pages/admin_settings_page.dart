@@ -265,7 +265,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'مثال: https://yaserkashea-ops.github.io/khutoot-baghdad/#${AdminConfig.path}',
+          'مثال: https://khutoot-baghdad.web.app/#${AdminConfig.path}',
           style: GoogleFonts.ibmPlexSansArabic(
             fontSize: 13,
             height: 1.5,

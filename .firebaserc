@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "khutoot-baghdad-app"
+  },
+  "targets": {
+    "khutoot-baghdad-app": {
+      "hosting": {
+        "main": [
+          "khutoot-baghdad"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

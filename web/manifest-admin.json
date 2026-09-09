@@ -1,5 +1,5 @@
 {
-  "id": "/khutoot-baghdad/admin-panel",
+  "id": "/admin-panel",
   "name": "لوحة تحكم خطوط بغداد",
   "short_name": "تحكم خطوط",
   "start_url": "./?mode=admin",
