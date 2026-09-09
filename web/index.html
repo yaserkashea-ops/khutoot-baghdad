@@ -69,7 +69,9 @@
 
   <script>
     (function () {
-      var isAdmin = location.pathname.indexOf('/admin') === 0;
+      var hash = (location.hash || '').replace(/^#/, '');
+      var isAdmin = hash.indexOf('/admin') === 0
+        || /(^|\/)admin(\/|$)/.test(location.pathname || '');
       var manifest = document.querySelector('link[rel="manifest"]');
       if (manifest) {
         manifest.setAttribute('href', isAdmin ? 'manifest-admin.json' : 'manifest.json');

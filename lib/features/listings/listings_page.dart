@@ -6,6 +6,7 @@ import '../../core/models/listing.dart';
 import '../../core/pwa/install_app_button.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_toggle_button.dart';
+import '../../core/utils/listing_contact.dart';
 import '../../data/listings_repository.dart';
 import '../support/contact_admin_sheet.dart';
 import 'publish_listing_page.dart';
@@ -118,14 +119,16 @@ class _ListingsPageState extends State<ListingsPage> {
     }
   }
 
-  void _onContact(Listing listing) {
+  Future<void> _onContact(Listing listing) async {
+    final opened = await ListingContact.open(listing);
+    if (opened || !mounted) return;
     final c = context.colors;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
         backgroundColor: c.text,
         content: Text(
-          'زر التواصل يُفعَّل في الخطوة التالية',
+          'لا توجد وسيلة تواصل لهذا الإعلان',
           style: GoogleFonts.ibmPlexSansArabic(
             fontWeight: FontWeight.w400,
             color: c.onPrimary,
