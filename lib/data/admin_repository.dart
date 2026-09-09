@@ -1,49 +1,89 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../core/config/admin_contact.dart';
+import '../core/data/supabase_mappers.dart';
 import '../core/models/admin_report.dart';
 import 'listings_repository.dart';
 
-/// Reports store + admin helpers. Shares [ListingsRepository] for listing ops.
+/// Reports store + admin helpers.
 class AdminRepository {
-  AdminRepository({ListingsRepository? listings})
-      : listings = listings ?? ListingsRepository.shared;
+  AdminRepository({
+    ListingsRepository? listings,
+    SupabaseClient? client,
+  })  : listings = listings ?? ListingsRepository.shared,
+        _client = client;
 
-  static final AdminRepository shared = AdminRepository();
+  static AdminRepository shared = AdminRepository();
 
   final ListingsRepository listings;
+  final SupabaseClient? _client;
 
-  final List<AdminReport> _reports = [
-    AdminReport(
-      id: 'r1',
-      kind: AdminContactKind.report,
-      message: 'إعلان يحتوي على تواصل غير لائق في خط المنصور.',
-      status: ReportStatus.open,
-      listingId: '1',
-      contactHint: '9647701112233',
-      createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-    ),
-    AdminReport(
-      id: 'r2',
-      kind: AdminContactKind.complaint,
-      message: 'السائق لم يلتزم بالنقاط الفرعية المذكورة.',
-      status: ReportStatus.inProgress,
-      listingId: '3',
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      adminNote: 'تم التواصل مع صاحب الإعلان',
-    ),
-    AdminReport(
-      id: 'r3',
-      kind: AdminContactKind.problem,
-      message: 'لا أستطيع تعديل منشوري بعد إدخال رقم الهاتف.',
-      status: ReportStatus.resolved,
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      adminNote: 'تم توجيه المستخدم لإعادة المحاولة',
-    ),
-  ];
-
+  late final List<AdminReport> _reports =
+      _client == null ? _seedLocal() : <AdminReport>[];
   int _seq = 200;
 
+  static void bindShared({
+    required ListingsRepository listings,
+    required SupabaseClient client,
+  }) {
+    shared = AdminRepository(listings: listings, client: client);
+  }
+
+  static List<AdminReport> _seedLocal() => [
+        AdminReport(
+          id: 'r1',
+          kind: AdminContactKind.report,
+          message: 'إعلان يحتوي على تواصل غير لائق في خط المنصور.',
+          status: ReportStatus.open,
+          listingId: '1',
+          contactHint: '9647701112233',
+          createdAt: DateTime.now().subtract(const Duration(hours: 3)),
+        ),
+        AdminReport(
+          id: 'r2',
+          kind: AdminContactKind.complaint,
+          message: 'السائق لم يلتزم بالنقاط الفرعية المذكورة.',
+          status: ReportStatus.inProgress,
+          listingId: '3',
+          createdAt: DateTime.now().subtract(const Duration(days: 1)),
+          adminNote: 'تم التواصل مع صاحب الإعلان',
+        ),
+        AdminReport(
+          id: 'r3',
+          kind: AdminContactKind.problem,
+          message: 'لا أستطيع تعديل منشوري بعد إدخال رقم الهاتف.',
+          status: ReportStatus.resolved,
+          createdAt: DateTime.now().subtract(const Duration(days: 2)),
+          adminNote: 'تم توجيه المستخدم لإعادة المحاولة',
+        ),
+      ];
+
   Future<List<AdminReport>> fetchReports({ReportStatus? status}) async {
-    await Future<void>.delayed(const Duration(milliseconds: 80));
+    if (_client != null) {
+      final List<Map<String, dynamic>> rows;
+      if (status != null) {
+        final raw = await _client
+            .from('admin_reports')
+            .select()
+            .eq('status', AdminReportMapper.statusTo(status))
+            .order('created_at', ascending: false);
+        rows = (raw as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      } else {
+        final raw = await _client
+            .from('admin_reports')
+            .select()
+            .order('created_at', ascending: false);
+        rows = (raw as List)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+      return List<AdminReport>.unmodifiable(
+        rows.map(AdminReportMapper.fromRow).toList(),
+      );
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 40));
     final copy = List<AdminReport>.from(_reports)
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     if (status == null) return List.unmodifiable(copy);
@@ -56,7 +96,22 @@ class AdminRepository {
     String? listingId,
     String? contactHint,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 60));
+    if (_client != null) {
+      final row = await _client
+          .from('admin_reports')
+          .insert(
+            AdminReportMapper.toInsert(
+              kind: kind,
+              message: message,
+              listingId: listingId,
+              contactHint: contactHint,
+            ),
+          )
+          .select()
+          .single();
+      return AdminReportMapper.fromRow(Map<String, dynamic>.from(row));
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 40));
     final report = AdminReport(
       id: 'r${_seq++}',
       kind: kind,
@@ -75,7 +130,25 @@ class AdminRepository {
     ReportStatus? status,
     String? adminNote,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 60));
+    if (_client != null) {
+      final patch = <String, dynamic>{
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      };
+      if (status != null) {
+        patch['status'] = AdminReportMapper.statusTo(status);
+      }
+      if (adminNote != null) {
+        patch['admin_note'] = adminNote;
+      }
+      final row = await _client
+          .from('admin_reports')
+          .update(patch)
+          .eq('id', id)
+          .select()
+          .single();
+      return AdminReportMapper.fromRow(Map<String, dynamic>.from(row));
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 40));
     final index = _reports.indexWhere((r) => r.id == id);
     if (index < 0) throw StateError('Report $id not found');
     final updated = _reports[index].copyWith(
@@ -88,7 +161,10 @@ class AdminRepository {
   }
 
   Future<bool> deleteReport(String id) async {
-    await Future<void>.delayed(const Duration(milliseconds: 40));
+    if (_client != null) {
+      await _client.from('admin_reports').delete().eq('id', id);
+      return true;
+    }
     final index = _reports.indexWhere((r) => r.id == id);
     if (index < 0) return false;
     _reports.removeAt(index);
@@ -96,14 +172,20 @@ class AdminRepository {
   }
 
   Future<AdminStats> fetchStats() async {
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    final open = _reports
-        .where(
-          (r) =>
-              r.status == ReportStatus.open ||
-              r.status == ReportStatus.inProgress,
-        )
-        .length;
+    if (_client != null) {
+      final reports = await fetchReports();
+      final open = reports.where((r) => r.status == ReportStatus.open).length;
+      return AdminStats(
+        listingsTotal: await listings.countAll(),
+        drivers: await listings.countDrivers(),
+        riders: await listings.countRiders(),
+        reportsOpen: open,
+        reportsTotal: reports.length,
+      );
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    final open =
+        _reports.where((r) => r.status == ReportStatus.open).length;
     return AdminStats(
       listingsTotal: listings.totalCount,
       drivers: listings.driverCount,
