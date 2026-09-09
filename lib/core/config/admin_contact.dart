@@ -2,7 +2,7 @@
 /// Replace placeholders with real numbers before production.
 abstract final class AdminContact {
   /// Digits only, country code included (Iraq example).
-  static const whatsappPhone = '9647700000000';
+  static const whatsappPhone = '9647760000989';
 
   /// Optional Telegram username or full t.me link.
   static const telegram = 'https://t.me/khutut_baghdad_admin';
