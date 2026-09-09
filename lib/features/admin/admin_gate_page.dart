@@ -218,6 +218,27 @@ class _AdminGatePageState extends State<AdminGatePage> {
                         : const Text('دخول'),
                   ),
                 ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    key: const Key('install_admin_gate_btn'),
+                    onPressed: () => runInstallAppFlow(context, forAdmin: true),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: c.primary,
+                      side: BorderSide(color: c.primary.withValues(alpha: 0.55)),
+                      shape: const RoundedRectangleBorder(),
+                    ),
+                    icon: const Icon(Icons.app_shortcut_outlined, size: 20),
+                    label: Text(
+                      'تثبيت لوحة التحكم على الرئيسية',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

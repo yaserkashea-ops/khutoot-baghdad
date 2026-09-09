@@ -5,7 +5,6 @@ import '../../../core/auth/admin_auth_controller.dart';
 import '../../../core/config/admin_config.dart';
 import '../../../core/config/admin_contact.dart';
 import '../../../core/pwa/install_app_button.dart';
-import '../../../core/pwa/pwa_install.dart';
 import '../../../core/theme/app_colors.dart';
 
 class AdminSettingsPage extends StatefulWidget {
@@ -215,34 +214,25 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
           ),
         ),
         const SizedBox(height: 12),
-        if (!PwaInstall.isStandalone)
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FilledButton.icon(
-              key: const Key('install_admin_settings_btn'),
-              onPressed: () => runInstallAppFlow(context, forAdmin: true),
-              style: FilledButton.styleFrom(
-                backgroundColor: c.primary,
-                foregroundColor: c.onPrimary,
-                shape: const RoundedRectangleBorder(),
-              ),
-              icon: const Icon(Icons.app_shortcut_outlined, size: 20),
-              label: Text(
-                'تثبيت لوحة التحكم على الرئيسية',
-                style: GoogleFonts.ibmPlexSansArabic(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: FilledButton.icon(
+            key: const Key('install_admin_settings_btn'),
+            onPressed: () => runInstallAppFlow(context, forAdmin: true),
+            style: FilledButton.styleFrom(
+              backgroundColor: c.primary,
+              foregroundColor: c.onPrimary,
+              shape: const RoundedRectangleBorder(),
             ),
-          )
-        else
-          Text(
-            'لوحة التحكم مثبتة على هذا الجهاز.',
-            style: GoogleFonts.ibmPlexSansArabic(
-              fontSize: 13,
-              color: c.primary,
+            icon: const Icon(Icons.app_shortcut_outlined, size: 20),
+            label: Text(
+              'تثبيت لوحة التحكم على الرئيسية',
+              style: GoogleFonts.ibmPlexSansArabic(
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
+        ),
         const SizedBox(height: 24),
         Text(
           'المظهر',

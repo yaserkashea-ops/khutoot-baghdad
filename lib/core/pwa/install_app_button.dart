@@ -76,6 +76,11 @@ class _InstallAppIconButtonState extends State<InstallAppIconButton> {
 
   void _refresh() {
     if (!mounted) return;
+    // Admin install stays visible even if the public app is already installed.
+    if (widget.forAdmin) {
+      setState(() => _show = true);
+      return;
+    }
     var standalone = false;
     try {
       standalone = PwaInstall.isStandalone;
