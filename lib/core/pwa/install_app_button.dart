@@ -12,8 +12,8 @@ Future<void> runInstallAppFlow(
   bool forAdmin = false,
 }) async {
   if (forAdmin) {
+    // Keep any deferred beforeinstallprompt — setMode no-ops if already admin.
     PwaInstall.setMode('admin');
-    PwaInstall.ensureAdminHash();
   }
 
   if (PwaInstall.canNativeInstall) {
@@ -21,7 +21,9 @@ Future<void> runInstallAppFlow(
     return;
   }
 
-  final ready = await PwaInstall.waitForPrompt();
+  final ready = await PwaInstall.waitForPrompt(
+    timeout: const Duration(milliseconds: 4000),
+  );
   if (ready || PwaInstall.canNativeInstall) {
     await PwaInstall.promptInstall();
     return;
@@ -152,10 +154,9 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
     });
     if (widget.forAdmin) {
       PwaInstall.setMode('admin');
-      PwaInstall.ensureAdminHash();
     }
     await PwaInstall.waitForPrompt(
-      timeout: const Duration(milliseconds: 1500),
+      timeout: const Duration(milliseconds: 4000),
     );
     final outcome = await PwaInstall.promptInstall();
     if (!mounted) return;
