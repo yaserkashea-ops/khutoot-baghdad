@@ -5,7 +5,7 @@ abstract final class AdminContact {
   static const whatsappPhone = '9647760000989';
 
   /// Optional Telegram username or full t.me link.
-  static const telegram = 'https://t.me/khutut_baghdad_admin';
+  static const telegram = 'https://t.me/Opal10';
 
   static String whatsappUrl(String message) {
     final encoded = Uri.encodeComponent(message);
