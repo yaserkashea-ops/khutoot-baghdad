@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
 import 'pwa_install.dart';
 
-/// Opens the browser native install UI (no instructional copy).
+/// Opens the browser native install UI, with a clear fallback when unavailable.
 Future<void> runInstallAppFlow(
   BuildContext context, {
   bool forAdmin = false,
@@ -16,13 +16,11 @@ Future<void> runInstallAppFlow(
     PwaInstall.ensureAdminHash();
   }
 
-  // Prefer the system install dialog immediately when ready.
   if (PwaInstall.canNativeInstall) {
     await PwaInstall.promptInstall();
     return;
   }
 
-  // Brief wait — Chrome often exposes the prompt right after engagement.
   final ready = await PwaInstall.waitForPrompt();
   if (ready || PwaInstall.canNativeInstall) {
     await PwaInstall.promptInstall();
@@ -30,7 +28,6 @@ Future<void> runInstallAppFlow(
   }
 
   if (!context.mounted) return;
-  // Fallback UI: install action only (no how-to text).
   await showModalBottomSheet<void>(
     context: context,
     backgroundColor: context.colors.background,
@@ -135,7 +132,6 @@ class _InstallAppIconButtonState extends State<InstallAppIconButton> {
   }
 }
 
-/// Single-action install surface — triggers native browser install dialog.
 class _InstallNowSheet extends StatefulWidget {
   const _InstallNowSheet({this.forAdmin = false});
 
@@ -147,9 +143,13 @@ class _InstallNowSheet extends StatefulWidget {
 
 class _InstallNowSheetState extends State<_InstallNowSheet> {
   bool _busy = false;
+  String? _hint;
 
   Future<void> _install() async {
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _hint = null;
+    });
     if (widget.forAdmin) {
       PwaInstall.setMode('admin');
       PwaInstall.ensureAdminHash();
@@ -162,7 +162,13 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
     setState(() => _busy = false);
     if (outcome == 'accepted' || outcome == 'dismissed') {
       Navigator.pop(context);
+      return;
     }
+    setState(() {
+      _hint = PwaInstall.isIos
+          ? 'من Safari: زر المشاركة ← «إضافة إلى الشاشة الرئيسية».'
+          : 'من Chrome: القائمة ⋮ ← «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».';
+    });
   }
 
   @override
@@ -170,6 +176,9 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
     final c = context.colors;
     final label =
         widget.forAdmin ? 'تثبيت لوحة التحكم الآن' : 'تثبيت الآن';
+    final title = widget.forAdmin
+        ? 'تثبيت لوحة التحكم'
+        : 'تثبيت التطبيق';
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
@@ -177,6 +186,27 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.ibmPlexSansArabic(
+                fontWeight: FontWeight.w700,
+                fontSize: 17,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.forAdmin
+                  ? 'سيظهر اختصار باسم «تحكم خطوط» على الشاشة الرئيسية.'
+                  : 'سيظهر اختصار باسم «خطوط بغداد» على الشاشة الرئيسية.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.ibmPlexSansArabic(
+                fontSize: 13,
+                height: 1.45,
+                color: c.text.withValues(alpha: 0.65),
+              ),
+            ),
+            const SizedBox(height: 16),
             SizedBox(
               height: 48,
               child: FilledButton(
@@ -204,6 +234,18 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
                       ),
               ),
             ),
+            if (_hint != null) ...[
+              const SizedBox(height: 14),
+              Text(
+                _hint!,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontSize: 13,
+                  height: 1.5,
+                  color: c.primary,
+                ),
+              ),
+            ],
           ],
         ),
       ),

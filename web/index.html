@@ -69,18 +69,52 @@
 
   <script>
     (function () {
+      // Drop stale caches/SW so phones don't keep an old build without the install button.
+      var CACHE_BUST = 'v4';
+      try {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            regs.forEach(function (r) { r.unregister(); });
+          });
+        }
+        if (window.caches && caches.keys) {
+          caches.keys().then(function (keys) {
+            keys.forEach(function (k) { caches.delete(k); });
+          });
+        }
+        if (sessionStorage.getItem('masarat-cb') !== CACHE_BUST) {
+          sessionStorage.setItem('masarat-cb', CACHE_BUST);
+          var u = new URL(location.href);
+          u.searchParams.set('cb', CACHE_BUST);
+          location.replace(u.toString());
+          return;
+        }
+      } catch (e) {}
+
       function detectAdminRoute() {
         var hash = (location.hash || '').replace(/^#/, '');
         return hash.indexOf('/admin') === 0
           || /(^|\/)admin(\/|$)/.test(location.pathname || '');
       }
 
+      // Path /.../admin → hash route so Flutter opens the gate.
+      try {
+        if (/(^|\/)admin\/?$/.test(location.pathname || '') &&
+            (location.hash || '').replace(/^#/, '').indexOf('/admin') !== 0) {
+          var baseEl = document.querySelector('base');
+          var base = (baseEl && baseEl.getAttribute('href')) || '/';
+          if (base.charAt(base.length - 1) !== '/') base += '/';
+          location.replace(base + '#/admin' + (location.search || ''));
+          return;
+        }
+      } catch (e) {}
+
       function applyMode(isAdmin) {
         var manifest = document.querySelector('link[rel="manifest"]');
         if (manifest) {
           manifest.setAttribute(
             'href',
-            (isAdmin ? 'manifest-admin.json' : 'manifest.json') + '?m=' + (isAdmin ? 'admin' : 'app')
+            (isAdmin ? 'manifest-admin.json' : 'manifest.json') + '?m=' + (isAdmin ? 'admin' : 'app') + '&cb=' + CACHE_BUST
           );
         }
         document.title = isAdmin ? 'لوحة تحكم خطوط بغداد' : 'خطوط بغداد';
