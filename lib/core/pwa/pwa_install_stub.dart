@@ -1,0 +1,16 @@
+/// Non-web stub.
+class PwaInstall {
+  static bool get isStandalone => false;
+  static bool get canNativeInstall => false;
+  static bool get isIos => false;
+  static bool get isMobile => false;
+
+  static Stream<void> get onStateChanged => const Stream.empty();
+
+  static Future<bool> waitForPrompt({
+    Duration timeout = const Duration(milliseconds: 2500),
+  }) async =>
+      false;
+
+  static Future<String> promptInstall() async => 'unavailable';
+}
