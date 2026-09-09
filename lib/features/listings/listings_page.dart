@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/data/baghdad_places.dart';
 import '../../core/models/listing.dart';
 import '../../core/pwa/install_app_button.dart';
+import '../../core/pwa/pwa_install.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_toggle_button.dart';
 import '../../core/utils/listing_contact.dart';
@@ -38,6 +39,7 @@ class _ListingsPageState extends State<ListingsPage> {
   @override
   void initState() {
     super.initState();
+    PwaInstall.setMode('app');
     _load();
   }
 

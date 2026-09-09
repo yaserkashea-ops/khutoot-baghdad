@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/auth/admin_auth_controller.dart';
 import '../../../core/config/admin_config.dart';
 import '../../../core/config/admin_contact.dart';
+import '../../../core/pwa/install_app_button.dart';
+import '../../../core/pwa/pwa_install.dart';
 import '../../../core/theme/app_colors.dart';
 
 class AdminSettingsPage extends StatefulWidget {
@@ -205,13 +207,42 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'من أيقونة التثبيت في أعلى اللوحة يمكن إضافة اختصار يفتح ${AdminConfig.path} على الشاشة الرئيسية.',
+          'أضف اختصاراً على الشاشة الرئيسية يفتح لوحة التحكم مباشرة باسم «تحكم خطوط».',
           style: GoogleFonts.ibmPlexSansArabic(
             fontSize: 13,
             height: 1.5,
             color: c.text.withValues(alpha: 0.65),
           ),
         ),
+        const SizedBox(height: 12),
+        if (!PwaInstall.isStandalone)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FilledButton.icon(
+              key: const Key('install_admin_settings_btn'),
+              onPressed: () => runInstallAppFlow(context, forAdmin: true),
+              style: FilledButton.styleFrom(
+                backgroundColor: c.primary,
+                foregroundColor: c.onPrimary,
+                shape: const RoundedRectangleBorder(),
+              ),
+              icon: const Icon(Icons.app_shortcut_outlined, size: 20),
+              label: Text(
+                'تثبيت لوحة التحكم على الرئيسية',
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          )
+        else
+          Text(
+            'لوحة التحكم مثبتة على هذا الجهاز.',
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontSize: 13,
+              color: c.primary,
+            ),
+          ),
         const SizedBox(height: 24),
         Text(
           'المظهر',
@@ -240,11 +271,11 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         const SizedBox(height: 8),
         _InfoTile(
           title: 'مسار لوحة التحكم',
-          value: AdminConfig.path,
+          value: '#${AdminConfig.path}',
         ),
         const SizedBox(height: 8),
         Text(
-          'مثال: https://your-domain.com${AdminConfig.path}',
+          'مثال: https://yaserkashea-ops.github.io/khutoot-baghdad/#${AdminConfig.path}',
           style: GoogleFonts.ibmPlexSansArabic(
             fontSize: 13,
             height: 1.5,

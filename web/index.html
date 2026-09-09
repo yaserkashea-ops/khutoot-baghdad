@@ -69,24 +69,33 @@
 
   <script>
     (function () {
-      var hash = (location.hash || '').replace(/^#/, '');
-      var isAdmin = hash.indexOf('/admin') === 0
-        || /(^|\/)admin(\/|$)/.test(location.pathname || '');
-      var manifest = document.querySelector('link[rel="manifest"]');
-      if (manifest) {
-        manifest.setAttribute('href', isAdmin ? 'manifest-admin.json' : 'manifest.json');
+      function detectAdminRoute() {
+        var hash = (location.hash || '').replace(/^#/, '');
+        return hash.indexOf('/admin') === 0
+          || /(^|\/)admin(\/|$)/.test(location.pathname || '');
       }
-      if (isAdmin) {
-        document.title = 'لوحة تحكم خطوط بغداد';
+
+      function applyMode(isAdmin) {
+        var manifest = document.querySelector('link[rel="manifest"]');
+        if (manifest) {
+          manifest.setAttribute(
+            'href',
+            (isAdmin ? 'manifest-admin.json' : 'manifest.json') + '?m=' + (isAdmin ? 'admin' : 'app')
+          );
+        }
+        document.title = isAdmin ? 'لوحة تحكم خطوط بغداد' : 'خطوط بغداد';
         var bootTitle = document.getElementById('masarat-boot-title');
-        if (bootTitle) bootTitle.textContent = 'تحكم خطوط';
+        if (bootTitle) bootTitle.textContent = isAdmin ? 'تحكم خطوط' : 'خطوط بغداد';
         var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
-        if (appleTitle) appleTitle.setAttribute('content', 'تحكم خطوط');
+        if (appleTitle) appleTitle.setAttribute('content', isAdmin ? 'تحكم خطوط' : 'خطوط بغداد');
       }
+
+      applyMode(detectAdminRoute());
 
       const api = {
         deferred: null,
         canInstall: false,
+        mode: detectAdminRoute() ? 'admin' : 'app',
         isStandalone: function () {
           // Only real home-screen install — do NOT treat minimal-ui (Chrome/Flutter web) as installed.
           return window.matchMedia('(display-mode: standalone)').matches
@@ -100,6 +109,21 @@
         isMobile: function () {
           return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
             || (navigator.maxTouchPoints > 1 && window.innerWidth < 900);
+        },
+        setMode: function (mode) {
+          var isAdmin = mode === 'admin';
+          api.mode = isAdmin ? 'admin' : 'app';
+          applyMode(isAdmin);
+          // Drop previous prompt so Chrome can re-evaluate against the new manifest.
+          api.deferred = null;
+          api.canInstall = false;
+          window.dispatchEvent(new CustomEvent('masarat-install-state'));
+        },
+        ensureAdminHash: function () {
+          var hash = (location.hash || '').replace(/^#/, '');
+          if (hash.indexOf('/admin') === 0) return false;
+          location.hash = '/admin';
+          return true;
         },
         promptInstall: async function () {
           if (!api.deferred) return 'unavailable';

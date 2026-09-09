@@ -11,6 +11,8 @@ extension type _PwaApi._(JSObject _) implements JSObject {
   external bool isStandalone();
   external bool isIos();
   external bool isMobile();
+  external void setMode(String mode);
+  external bool ensureAdminHash();
   external JSPromise<JSAny?> promptInstall();
   external JSPromise<JSBoolean> waitForPrompt(JSNumber ms);
 }
@@ -68,6 +70,22 @@ class PwaInstall {
   static Stream<void> get onStateChanged {
     _ensureListening();
     return _controller.stream;
+  }
+
+  /// `admin` uses manifest-admin (لوحة التحكم); `app` uses the public app.
+  static void setMode(String mode) {
+    try {
+      _api?.setMode(mode);
+    } catch (_) {}
+  }
+
+  /// Ensures the URL hash points at `/admin`. Returns true if it navigated.
+  static bool ensureAdminHash() {
+    try {
+      return _api?.ensureAdminHash() ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Wait until the browser exposes its native install prompt.

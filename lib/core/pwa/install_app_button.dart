@@ -7,7 +7,15 @@ import '../theme/app_colors.dart';
 import 'pwa_install.dart';
 
 /// Opens the browser native install UI (no instructional copy).
-Future<void> runInstallAppFlow(BuildContext context) async {
+Future<void> runInstallAppFlow(
+  BuildContext context, {
+  bool forAdmin = false,
+}) async {
+  if (forAdmin) {
+    PwaInstall.setMode('admin');
+    PwaInstall.ensureAdminHash();
+  }
+
   // Prefer the system install dialog immediately when ready.
   if (PwaInstall.canNativeInstall) {
     await PwaInstall.promptInstall();
@@ -28,13 +36,19 @@ Future<void> runInstallAppFlow(BuildContext context) async {
     backgroundColor: context.colors.background,
     shape: const RoundedRectangleBorder(),
     isDismissible: true,
-    builder: (ctx) => const _InstallNowSheet(),
+    builder: (ctx) => _InstallNowSheet(forAdmin: forAdmin),
   );
 }
 
 /// Compact AppBar install control — icon only.
 class InstallAppIconButton extends StatefulWidget {
-  const InstallAppIconButton({super.key});
+  const InstallAppIconButton({
+    super.key,
+    this.forAdmin = false,
+  });
+
+  /// When true, switches to the admin PWA manifest before install.
+  final bool forAdmin;
 
   @override
   State<InstallAppIconButton> createState() => _InstallAppIconButtonState();
@@ -47,6 +61,9 @@ class _InstallAppIconButtonState extends State<InstallAppIconButton> {
   @override
   void initState() {
     super.initState();
+    if (widget.forAdmin) {
+      PwaInstall.setMode('admin');
+    }
     _sub = PwaInstall.onStateChanged.listen((_) => _refresh());
     WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
   }
@@ -73,15 +90,18 @@ class _InstallAppIconButtonState extends State<InstallAppIconButton> {
     if (!_show) return const SizedBox.shrink();
 
     final c = context.colors;
+    final tip = widget.forAdmin
+        ? 'تثبيت لوحة التحكم على الرئيسية'
+        : 'تثبيت على الشاشة الرئيسية';
     return Tooltip(
-      message: 'تثبيت على الشاشة الرئيسية',
+      message: tip,
       child: Padding(
         padding: const EdgeInsetsDirectional.only(start: 2, end: 2),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            key: const Key('install_home_icon'),
-            onTap: () => runInstallAppFlow(context),
+            key: Key(widget.forAdmin ? 'install_admin_icon' : 'install_home_icon'),
+            onTap: () => runInstallAppFlow(context, forAdmin: widget.forAdmin),
             child: SizedBox(
               width: 36,
               height: 36,
@@ -112,7 +132,9 @@ class _InstallAppIconButtonState extends State<InstallAppIconButton> {
 
 /// Single-action install surface — triggers native browser install dialog.
 class _InstallNowSheet extends StatefulWidget {
-  const _InstallNowSheet();
+  const _InstallNowSheet({this.forAdmin = false});
+
+  final bool forAdmin;
 
   @override
   State<_InstallNowSheet> createState() => _InstallNowSheetState();
@@ -123,6 +145,10 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
 
   Future<void> _install() async {
     setState(() => _busy = true);
+    if (widget.forAdmin) {
+      PwaInstall.setMode('admin');
+      PwaInstall.ensureAdminHash();
+    }
     await PwaInstall.waitForPrompt(
       timeout: const Duration(milliseconds: 1500),
     );
@@ -137,6 +163,8 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final label =
+        widget.forAdmin ? 'تثبيت لوحة التحكم الآن' : 'تثبيت الآن';
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
@@ -163,7 +191,7 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
                         ),
                       )
                     : Text(
-                        'تثبيت الآن',
+                        label,
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontWeight: FontWeight.w600,
                           fontSize: 16,

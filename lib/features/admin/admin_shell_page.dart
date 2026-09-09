@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/auth/admin_auth_controller.dart';
 import '../../core/config/admin_config.dart';
 import '../../core/pwa/install_app_button.dart';
+import '../../core/pwa/pwa_install.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_toggle_button.dart';
 import 'admin_gate_page.dart';
@@ -30,6 +31,12 @@ class _AdminShellPageState extends State<AdminShellPage> {
     'البلاغات',
     'الإعدادات',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    PwaInstall.setMode('admin');
+  }
 
   Future<void> _logout() async {
     await AdminAuthController.shared.signOut();
@@ -60,7 +67,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
-          const InstallAppIconButton(),
+          const InstallAppIconButton(forAdmin: true),
           const ThemeToggleButton(),
           TextButton(
             onPressed: _logout,

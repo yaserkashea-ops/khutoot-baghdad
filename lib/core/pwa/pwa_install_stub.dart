@@ -7,6 +7,10 @@ class PwaInstall {
 
   static Stream<void> get onStateChanged => const Stream.empty();
 
+  static void setMode(String mode) {}
+
+  static bool ensureAdminHash() => false;
+
   static Future<bool> waitForPrompt({
     Duration timeout = const Duration(milliseconds: 2500),
   }) async =>
