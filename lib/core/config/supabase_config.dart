@@ -17,10 +17,11 @@ abstract final class SupabaseConfig {
   );
 
   /// Paste project URL here (https://xxxx.supabase.co).
-  static const _urlFallback = '';
+  static const _urlFallback = 'https://plqhpbtkgforuvqferou.supabase.co';
 
   /// Paste the anon / public key here.
-  static const _anonKeyFallback = '';
+  static const _anonKeyFallback =
+      'sb_publishable_SEVHXVQEu_yCz7dLNdIkCA_5H_odBRI';
 
   static bool get isConfigured =>
       url.trim().isNotEmpty && anonKey.trim().isNotEmpty;
