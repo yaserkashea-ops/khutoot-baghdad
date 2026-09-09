@@ -1,17 +1,36 @@
-# masarat
+# خطوط بغداد (khutoot-baghdad)
 
-A new Flutter project.
+تنظيم إعلانات خطوط النقل المشترك في بغداد.
 
-## Getting Started
+## الروابط النهائية
 
-This project is a starting point for a Flutter application.
+| الخدمة | الرابط |
+|---|---|
+| الأداة العامة | https://khutoot-baghdad.web.app |
+| لوحة التحكم | https://khutoot-baghdad-admin.web.app |
+| تصفير الكاش (عند عدم ظهور التحديث) | https://khutoot-baghdad.web.app/reset.html |
 
-A few resources to get you started if this is your first Flutter project:
+ملاحظات:
+- `https://khutoot-baghdad-app.web.app` يحوّل تلقائياً إلى الرابط العام أعلاه.
+- `/admin` على الموقع العام يحوّل إلى موقع لوحة التحكم.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## المستودع
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+https://github.com/yaserkashea-ops/khutoot-baghdad
+
+## الخدمات المتصلة
+
+| الخدمة | الحالة |
+|---|---|
+| **Firebase Hosting** | مشروع `khutoot-baghdad-app` — مواقع: `khutoot-baghdad` + `khutoot-baghdad-admin` + تحويل `khutoot-baghdad-app` |
+| **Supabase** | مشروع `plqhpbtkgforuvqferou` — جداول `listings` و `admin_reports` (انظر `supabase/schema.sql`) |
+| **GitHub** | المستودع أعلاه |
+
+### نشر الويب
+
+```bash
+flutter build web --release
+firebase deploy --only hosting:main,hosting:app,hosting:admin --project khutoot-baghdad-app
+```
+
+بعد كل نشر مهم: ارفع رقم الإصدار في `web/index.html` و `web/admin.html` و `web/sw.js` و `web/version.json` معاً.

@@ -289,13 +289,13 @@ class _PublishListingPageState extends State<PublishListingPage> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 640),
             child: ListView(
-              padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 16, 32),
+              padding: const EdgeInsetsDirectional.fromSTEB(14, 6, 14, 28),
               children: [
             Text(
               'نوع الإعلان',
               style: _sectionLabel(c),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
@@ -306,7 +306,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
                     onTap: () => setState(() => _type = ListingType.driver),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: _TypeToggle(
                     label: 'راكب يطلب خطاً',
@@ -317,7 +317,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             SuggestibleTextField(
               fieldKey: const Key('field_area'),
               label: 'المنطقة',
@@ -326,7 +326,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
               options: _knownAreas,
               addMissingLabel: BaghdadPlaces.addMissingArea,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             SuggestibleTextField(
               fieldKey: const Key('field_destination'),
               label: 'الوجهة',
@@ -336,18 +336,18 @@ class _PublishListingPageState extends State<PublishListingPage> {
               options: _knownDestinations,
               addMissingLabel: BaghdadPlaces.addMissingDestination,
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
             Text('نقاط فرعية داخل المنطقة (من)', style: _sectionLabel(c)),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
-              'اختياري — أكثر من نقطة انطلاق داخل المنطقة المختارة',
+              'اختياري — أكثر من نقطة انطلاق داخل المنطقة',
               style: GoogleFonts.ibmPlexSansArabic(
                 fontWeight: FontWeight.w400,
-                fontSize: 12,
-                color: c.text.withValues(alpha: 0.55),
+                fontSize: 11,
+                color: c.text.withValues(alpha: 0.5),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             SuggestibleTextField(
               fieldKey: const Key('field_origin_sub'),
               label: 'أضف نقطة انطلاق فرعية',
@@ -364,13 +364,14 @@ class _PublishListingPageState extends State<PublishListingPage> {
                   _originSubs,
                   (next) => _originSubs = next,
                 ),
-                icon: const Icon(Icons.add, size: 18),
+                icon: const Icon(Icons.add, size: 16),
                 label: const Text('إضافة نقطة من'),
                 style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
                   foregroundColor: c.primary,
                   textStyle: GoogleFonts.ibmPlexSansArabic(
                     fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                    fontSize: 13,
                   ),
                 ),
               ),
@@ -384,18 +385,18 @@ class _PublishListingPageState extends State<PublishListingPage> {
                   (next) => _originSubs = next,
                 ),
               ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             Text('نقاط فرعية داخل الوجهة (إلى)', style: _sectionLabel(c)),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
-              'اختياري — أكثر من نقطة وصول داخل الوجهة المختارة',
+              'اختياري — أكثر من نقطة وصول داخل الوجهة',
               style: GoogleFonts.ibmPlexSansArabic(
                 fontWeight: FontWeight.w400,
-                fontSize: 12,
-                color: c.text.withValues(alpha: 0.55),
+                fontSize: 11,
+                color: c.text.withValues(alpha: 0.5),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             SuggestibleTextField(
               fieldKey: const Key('field_destination_sub'),
               label: 'أضف نقطة وصول فرعية',
@@ -412,13 +413,14 @@ class _PublishListingPageState extends State<PublishListingPage> {
                   _destinationSubs,
                   (next) => _destinationSubs = next,
                 ),
-                icon: const Icon(Icons.add, size: 18),
+                icon: const Icon(Icons.add, size: 16),
                 label: const Text('إضافة نقطة إلى'),
                 style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
                   foregroundColor: c.primary,
                   textStyle: GoogleFonts.ibmPlexSansArabic(
                     fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                    fontSize: 13,
                   ),
                 ),
               ),
@@ -433,77 +435,81 @@ class _PublishListingPageState extends State<PublishListingPage> {
                 ),
               ),
             if (_originSubs.isNotEmpty || _destinationSubs.isNotEmpty) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
                 '${_originSubs.isEmpty ? '—' : _originSubs.join('، ')}  ←  ${_destinationSubs.isEmpty ? '—' : _destinationSubs.join('، ')}',
                 style: GoogleFonts.ibmPlexSansArabic(
                   fontWeight: FontWeight.w400,
-                  fontSize: 13,
-                  height: 1.45,
+                  fontSize: 12,
+                  height: 1.4,
                   color: c.primary,
                 ),
               ),
             ],
             if (_type == ListingType.driver) ...[
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               _Field(
                 fieldKey: const Key('field_vehicle'),
                 label: 'نوع السيارة',
                 controller: _vehicle,
                 validator: _required,
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               _Field(
                 fieldKey: const Key('field_seats'),
                 label: 'عدد المقاعد',
                 controller: _seats,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                style: AppTheme.manrope(fontSize: 15),
+                style: AppTheme.manrope(fontSize: 14),
                 validator: _required,
               ),
             ],
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             Text('التوقيت', style: _sectionLabel(c)),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
-              'اختيار صباحي أو مسائي إلزامي',
+              'صباحي أو مسائي — إلزامي',
               style: GoogleFonts.ibmPlexSansArabic(
                 fontWeight: FontWeight.w400,
-                fontSize: 12,
-                color: c.text.withValues(alpha: 0.55),
+                fontSize: 11,
+                color: c.text.withValues(alpha: 0.5),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               children: [
-                _QuickTimeChip(
-                  label: 'صباحي',
-                  selected: _timePeriod == TimePeriod.morning,
-                  onTap: () =>
-                      setState(() => _timePeriod = TimePeriod.morning),
+                Expanded(
+                  child: _ChoiceChip(
+                    label: 'صباحي',
+                    selected: _timePeriod == TimePeriod.morning,
+                    onTap: () =>
+                        setState(() => _timePeriod = TimePeriod.morning),
+                  ),
                 ),
-                const SizedBox(width: 8),
-                _QuickTimeChip(
-                  label: 'مسائي',
-                  selected: _timePeriod == TimePeriod.evening,
-                  onTap: () =>
-                      setState(() => _timePeriod = TimePeriod.evening),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _ChoiceChip(
+                    label: 'مسائي',
+                    selected: _timePeriod == TimePeriod.evening,
+                    onTap: () =>
+                        setState(() => _timePeriod = TimePeriod.evening),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             Text('ساعات الانطلاق والعودة', style: _sectionLabel(c)),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               'اختياري — اذكر الساعة إن رغبت',
               style: GoogleFonts.ibmPlexSansArabic(
                 fontWeight: FontWeight.w400,
-                fontSize: 12,
-                color: c.text.withValues(alpha: 0.55),
+                fontSize: 11,
+                color: c.text.withValues(alpha: 0.5),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
@@ -511,86 +517,91 @@ class _PublishListingPageState extends State<PublishListingPage> {
                     fieldKey: const Key('field_departure'),
                     label: 'ساعة الانطلاق',
                     controller: _departureTime,
-                    hint: 'مثال: 7:30',
-                    style: AppTheme.manrope(fontSize: 15),
+                    hint: '7:30',
+                    style: AppTheme.manrope(fontSize: 14),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: _Field(
                     fieldKey: const Key('field_return'),
                     label: 'ساعة العودة',
                     controller: _returnTime,
-                    hint: 'مثال: 2:00',
-                    style: AppTheme.manrope(fontSize: 15),
+                    hint: '2:00',
+                    style: AppTheme.manrope(fontSize: 14),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             Text('الجنس المطلوب', style: _sectionLabel(c)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            const SizedBox(height: 6),
+            Row(
               children: [
-                for (final option in GenderRequirement.values)
-                  _QuickTimeChip(
-                    label: switch (option) {
-                      GenderRequirement.femaleOnly => 'بنات فقط',
-                      GenderRequirement.maleOnly => 'ذكور فقط',
-                      GenderRequirement.mixed => 'مختلط',
-                    },
-                    selected: _gender == option,
-                    onTap: () => setState(() => _gender = option),
+                for (final option in GenderRequirement.values) ...[
+                  if (option != GenderRequirement.values.first)
+                    const SizedBox(width: 6),
+                  Expanded(
+                    child: _ChoiceChip(
+                      label: switch (option) {
+                        GenderRequirement.femaleOnly => 'بنات',
+                        GenderRequirement.maleOnly => 'ذكور',
+                        GenderRequirement.mixed => 'مختلط',
+                      },
+                      selected: _gender == option,
+                      onTap: () => setState(() => _gender = option),
+                    ),
                   ),
+                ],
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             Text('وسيلة التواصل', style: _sectionLabel(c)),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
-              'رقم هاتف و/أو رابط أو يوزر تلغرام — واحد منهما على الأقل',
+              'هاتف و/أو تلغرام — واحد منهما على الأقل',
               style: GoogleFonts.ibmPlexSansArabic(
                 fontWeight: FontWeight.w400,
-                fontSize: 12,
-                color: c.text.withValues(alpha: 0.55),
+                fontSize: 11,
+                color: c.text.withValues(alpha: 0.5),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             _Field(
               fieldKey: const Key('field_phone'),
               label: 'رقم الهاتف',
               controller: _phone,
               keyboardType: TextInputType.phone,
-              style: AppTheme.manrope(fontSize: 15),
+              style: AppTheme.manrope(fontSize: 14),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             _Field(
               fieldKey: const Key('field_telegram'),
               label: 'تلغرام (رابط أو يوزر)',
               controller: _telegram,
               hint: '@user أو https://t.me/...',
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
-              height: 48,
+              height: 44,
               child: FilledButton(
                 onPressed: _saving ? null : _submit,
                 style: FilledButton.styleFrom(
                   backgroundColor: c.primary,
                   foregroundColor: c.onPrimary,
-                  shape: const RoundedRectangleBorder(),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   textStyle: GoogleFonts.ibmPlexSansArabic(
                     fontWeight: FontWeight.w600,
-                    fontSize: 16,
+                    fontSize: 15,
                   ),
                 ),
                 child: _saving
                     ? SizedBox(
-                        width: 22,
-                        height: 22,
+                        width: 20,
+                        height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: c.onPrimary,
@@ -610,8 +621,8 @@ class _PublishListingPageState extends State<PublishListingPage> {
   TextStyle _sectionLabel(MasaratColors c) {
     return GoogleFonts.ibmPlexSansArabic(
       fontWeight: FontWeight.w600,
-      fontSize: 13,
-      color: c.text.withValues(alpha: 0.7),
+      fontSize: 11,
+      color: c.text.withValues(alpha: 0.5),
     );
   }
 }
@@ -633,27 +644,29 @@ class _TypeToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Material(
-      color: selected ? accent.withValues(alpha: 0.1) : c.surface,
+      color: selected ? accent.withValues(alpha: 0.1) : c.surface.withValues(alpha: 0.92),
+      borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
         child: Container(
-          padding: const EdgeInsetsDirectional.symmetric(
-            horizontal: 10,
-            vertical: 14,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: selected ? accent : c.border,
-              width: selected ? 1.5 : 1,
+              color: selected ? accent.withValues(alpha: 0.85) : c.border.withValues(alpha: 0.85),
             ),
           ),
           child: Text(
             label,
             textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.ibmPlexSansArabic(
               fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-              fontSize: 13,
-              color: selected ? accent : c.text,
+              fontSize: 12,
+              height: 1.25,
+              color: selected ? accent : c.text.withValues(alpha: 0.85),
             ),
           ),
         ),
@@ -662,8 +675,8 @@ class _TypeToggle extends StatelessWidget {
   }
 }
 
-class _QuickTimeChip extends StatelessWidget {
-  const _QuickTimeChip({
+class _ChoiceChip extends StatelessWidget {
+  const _ChoiceChip({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -677,25 +690,33 @@ class _QuickTimeChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Material(
-      color: selected ? c.primary.withValues(alpha: 0.12) : c.surface,
+      color: selected
+          ? c.primary.withValues(alpha: 0.12)
+          : c.surface.withValues(alpha: 0.92),
+      borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
         child: Container(
-          padding: const EdgeInsetsDirectional.symmetric(
-            horizontal: 12,
-            vertical: 8,
-          ),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: selected ? c.primary : c.border,
+              color: selected
+                  ? c.primary.withValues(alpha: 0.7)
+                  : c.border.withValues(alpha: 0.85),
             ),
           ),
           child: Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: GoogleFonts.ibmPlexSansArabic(
               fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-              fontSize: 13,
-              color: selected ? c.primary : c.text,
+              fontSize: 12,
+              color: selected ? c.primary : c.text.withValues(alpha: 0.85),
             ),
           ),
         ),
@@ -728,10 +749,11 @@ class _Field extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final radius = BorderRadius.circular(8);
     final textStyle = style ??
         GoogleFonts.ibmPlexSansArabic(
           fontWeight: FontWeight.w400,
-          fontSize: 15,
+          fontSize: 12,
           color: c.text,
         );
 
@@ -742,11 +764,11 @@ class _Field extends StatelessWidget {
           label,
           style: GoogleFonts.ibmPlexSansArabic(
             fontWeight: FontWeight.w600,
-            fontSize: 13,
-            color: c.text.withValues(alpha: 0.7),
+            fontSize: 10,
+            color: c.text.withValues(alpha: 0.48),
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 3),
         TextFormField(
           key: fieldKey,
           controller: controller,
@@ -758,26 +780,27 @@ class _Field extends StatelessWidget {
             hintText: hint,
             hintStyle: GoogleFonts.ibmPlexSansArabic(
               fontWeight: FontWeight.w400,
-              fontSize: 14,
-              color: c.text.withValues(alpha: 0.4),
+              fontSize: 11,
+              color: c.text.withValues(alpha: 0.35),
             ),
+            isDense: true,
             filled: true,
-            fillColor: c.surface,
-            contentPadding: const EdgeInsetsDirectional.fromSTEB(12, 12, 12, 12),
+            fillColor: c.surface.withValues(alpha: 0.92),
+            contentPadding: const EdgeInsetsDirectional.fromSTEB(8, 6, 8, 6),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.zero,
-              borderSide: BorderSide(color: c.border),
+              borderRadius: radius,
+              borderSide: BorderSide(color: c.border.withValues(alpha: 0.8)),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.zero,
-              borderSide: BorderSide(color: c.border),
+              borderRadius: radius,
+              borderSide: BorderSide(color: c.border.withValues(alpha: 0.8)),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.zero,
-              borderSide: BorderSide(color: c.primary, width: 1.4),
+              borderRadius: radius,
+              borderSide: BorderSide(color: c.primary.withValues(alpha: 0.8)),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.zero,
+              borderRadius: radius,
               borderSide: BorderSide(color: c.riderAccent),
             ),
           ),
@@ -800,22 +823,26 @@ class _SubChips extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Padding(
-      padding: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.only(top: 2),
       child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
+        spacing: 6,
+        runSpacing: 6,
         children: [
           for (final item in items)
             InputChip(
               label: Text(
                 item,
-                style: GoogleFonts.ibmPlexSansArabic(fontSize: 13),
+                style: GoogleFonts.ibmPlexSansArabic(fontSize: 12),
               ),
               onDeleted: () => onRemove(item),
-              deleteIconColor: c.text.withValues(alpha: 0.55),
-              side: BorderSide(color: c.border),
-              backgroundColor: c.surface,
-              shape: const RoundedRectangleBorder(),
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              deleteIconColor: c.text.withValues(alpha: 0.5),
+              side: BorderSide(color: c.border.withValues(alpha: 0.85)),
+              backgroundColor: c.surface.withValues(alpha: 0.92),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
         ],
       ),

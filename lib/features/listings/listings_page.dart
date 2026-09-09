@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/config/app_hosts.dart';
 import '../../core/data/baghdad_places.dart';
 import '../../core/models/listing.dart';
 import '../../core/pwa/install_app_button.dart';
@@ -148,12 +149,25 @@ class _ListingsPageState extends State<ListingsPage> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: Text(
-          'خطوط بغداد',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'خطوط بغداد',
+              style: GoogleFonts.ibmPlexSansArabic(
+                fontWeight: FontWeight.w600,
+                fontSize: 18,
+              ),
+            ),
+            Text(
+              'نسخة ${AppHosts.buildLabel}',
+              style: GoogleFonts.ibmPlexSansArabic(
+                fontWeight: FontWeight.w400,
+                fontSize: 10,
+                color: c.text.withValues(alpha: 0.45),
+              ),
+            ),
+          ],
         ),
         actions: [
           const InstallAppIconButton(),
@@ -180,64 +194,67 @@ class _ListingsPageState extends State<ListingsPage> {
                 alignment: Alignment.topCenter,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 720),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsetsDirectional.fromSTEB(
-                          16,
-                          4,
-                          16,
-                          12,
+                  child: ClipRect(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsetsDirectional.fromSTEB(
+                            12,
+                            2,
+                            12,
+                            6,
+                          ),
+                          child: FilterChipsBar(
+                            areas: _areas,
+                            destinations: _destinations,
+                            timeSlots: _timeSlots,
+                            areaQuery: _areaQuery,
+                            destinationQuery: _destinationQuery,
+                            selectedTimeSlot: _timeSlot,
+                            selectedGender: _gender,
+                            onAreaQueryChanged: (v) =>
+                                setState(() => _areaQuery = v),
+                            onDestinationQueryChanged: (v) =>
+                                setState(() => _destinationQuery = v),
+                            onTimeSlotChanged: (v) =>
+                                setState(() => _timeSlot = v),
+                            onGenderChanged: (v) =>
+                                setState(() => _gender = v),
+                          ),
                         ),
-                        child: FilterChipsBar(
-                          areas: _areas,
-                          destinations: _destinations,
-                          timeSlots: _timeSlots,
-                          areaQuery: _areaQuery,
-                          destinationQuery: _destinationQuery,
-                          selectedTimeSlot: _timeSlot,
-                          selectedGender: _gender,
-                          onAreaQueryChanged: (v) =>
-                              setState(() => _areaQuery = v),
-                          onDestinationQueryChanged: (v) =>
-                              setState(() => _destinationQuery = v),
-                          onTimeSlotChanged: (v) =>
-                              setState(() => _timeSlot = v),
-                          onGenderChanged: (v) => setState(() => _gender = v),
-                        ),
-                      ),
-                      Divider(height: 1, color: c.border),
-                      Expanded(
-                        child: filtered.isEmpty
-                            ? EmptyListingsState(onPublish: _onPublish)
-                            : RefreshIndicator(
-                                color: c.primary,
-                                onRefresh: _load,
-                                child: ListView.separated(
-                                  padding:
-                                      const EdgeInsetsDirectional.fromSTEB(
-                                    0,
-                                    8,
-                                    0,
-                                    88,
+                        Divider(height: 1, color: c.border),
+                        Expanded(
+                          child: filtered.isEmpty
+                              ? EmptyListingsState(onPublish: _onPublish)
+                              : RefreshIndicator(
+                                  color: c.primary,
+                                  onRefresh: _load,
+                                  child: ListView.separated(
+                                    padding:
+                                        const EdgeInsetsDirectional.fromSTEB(
+                                      0,
+                                      4,
+                                      0,
+                                      88,
+                                    ),
+                                    itemCount: filtered.length,
+                                    separatorBuilder: (_, _) => Divider(
+                                      height: 1,
+                                      color: c.border,
+                                    ),
+                                    itemBuilder: (context, index) {
+                                      final listing = filtered[index];
+                                      return ListingCard(
+                                        listing: listing,
+                                        onContact: () => _onContact(listing),
+                                      );
+                                    },
                                   ),
-                                  itemCount: filtered.length,
-                                  separatorBuilder: (_, _) => Divider(
-                                    height: 1,
-                                    color: c.border,
-                                  ),
-                                  itemBuilder: (context, index) {
-                                    final listing = filtered[index];
-                                    return ListingCard(
-                                      listing: listing,
-                                      onContact: () => _onContact(listing),
-                                    );
-                                  },
                                 ),
-                              ),
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

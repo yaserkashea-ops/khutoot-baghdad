@@ -66,21 +66,52 @@
 
   <script>
     (function () {
-      var CACHE_BUST = 'v7';
-      try {
-        if (sessionStorage.getItem('masarat-admin-cb') !== CACHE_BUST) {
-          sessionStorage.setItem('masarat-admin-cb', CACHE_BUST);
-          var u = new URL(location.href);
-          u.searchParams.set('cb', CACHE_BUST);
-          location.replace(u.toString());
-          return;
-        }
-      } catch (e) {}
+      // Bump with every deploy (must match web/sw.js APP_VERSION).
+      var CACHE_BUST = 'v14';
+      var VERSION_KEY = 'masarat-admin-app-version';
+      var reloading = false;
 
-      if ((location.hash || '').replace(/^#/, '').indexOf('/admin') !== 0) {
-        location.replace('/admin#/admin');
-        return;
+      function hardReload() {
+        if (reloading) return;
+        reloading = true;
+        var u = new URL(location.href);
+        u.searchParams.set('cb', CACHE_BUST);
+        u.searchParams.set('_', String(Date.now()));
+        location.replace(u.toString());
       }
+
+      function enforceFreshSession() {
+        var previous = null;
+        try { previous = localStorage.getItem(VERSION_KEY); } catch (e) {}
+        if (previous === CACHE_BUST) return Promise.resolve(false);
+
+        return Promise.resolve()
+          .then(function () {
+            if (!('caches' in window)) return;
+            return caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+            });
+          })
+          .then(function () {
+            if (!('serviceWorker' in navigator)) return;
+            return navigator.serviceWorker.getRegistrations().then(function (regs) {
+              return Promise.all(regs.map(function (r) { return r.unregister(); }));
+            });
+          })
+          .then(function () {
+            try { localStorage.setItem(VERSION_KEY, CACHE_BUST); } catch (e) {}
+            hardReload();
+            return true;
+          })
+          .catch(function () {
+            try { localStorage.setItem(VERSION_KEY, CACHE_BUST); } catch (e) {}
+            hardReload();
+            return true;
+          });
+      }
+
+      enforceFreshSession().then(function (reloaded) {
+        if (reloaded) return;
 
       const api = {
         deferred: null,
@@ -107,12 +138,10 @@
           return true;
         },
         isAdminEntry: function () {
-          return /(^|\/)admin(\/|$)/.test(location.pathname || '');
+          return true;
         },
         openAdminEntry: function () {
-          if (api.isAdminEntry()) return false;
-          location.assign('/admin');
-          return true;
+          return false;
         },
         promptInstall: async function () {
           if (!api.deferred) return 'unavailable';
@@ -163,8 +192,17 @@
       });
 
       if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          try {
+            if (sessionStorage.getItem('masarat-admin-sw-reload') === CACHE_BUST) return;
+            sessionStorage.setItem('masarat-admin-sw-reload', CACHE_BUST);
+          } catch (e) {}
+          hardReload();
+        });
         window.addEventListener('load', function () {
-          navigator.serviceWorker.register('sw.js?v=' + CACHE_BUST).catch(function () {});
+          navigator.serviceWorker.register('sw.js?v=' + CACHE_BUST).then(function (reg) {
+            if (reg && reg.update) reg.update().catch(function () {});
+          }).catch(function () {});
         });
       }
 
@@ -178,9 +216,10 @@
         const el = document.getElementById('masarat-boot');
         if (el) el.remove();
       }, 8000);
+      }); // end enforceFreshSession
     })();
   </script>
 
-  <script src="flutter_bootstrap.js" async></script>
+  <script src="flutter_bootstrap.js?v=14" async></script>
 </body>
 </html>

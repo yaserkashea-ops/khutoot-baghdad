@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../config/admin_config.dart';
 import '../theme/app_colors.dart';
 import 'pwa_install.dart';
 
@@ -169,7 +170,7 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
     setState(() {
       _hint = PwaInstall.isIos
           ? 'من Safari: زر المشاركة ثم إضافة إلى الشاشة الرئيسية.'
-          : 'من Chrome: افتح رابط /admin ثم من القائمة اختر تثبيت التطبيق.';
+          : 'من Chrome: افتح ${AdminConfig.publicOrigin} ثم من القائمة اختر تثبيت التطبيق.';
     });
   }
 

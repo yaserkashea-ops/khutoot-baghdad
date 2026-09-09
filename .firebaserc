@@ -7,6 +7,12 @@
       "hosting": {
         "main": [
           "khutoot-baghdad"
+        ],
+        "admin": [
+          "khutoot-baghdad-admin"
+        ],
+        "app": [
+          "khutoot-baghdad-app"
         ]
       }
     }

@@ -5,7 +5,6 @@ import '../../../core/data/baghdad_places.dart';
 import '../../../core/theme/app_colors.dart';
 
 /// Text field with suggestion list: type to match, or tap to select.
-/// Custom values via [addMissingLabel] at the bottom of results.
 class SuggestibleTextField extends StatefulWidget {
   const SuggestibleTextField({
     super.key,
@@ -63,9 +62,10 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final radius = BorderRadius.circular(8);
     final textStyle = GoogleFonts.ibmPlexSansArabic(
       fontWeight: FontWeight.w400,
-      fontSize: 15,
+      fontSize: 12,
       color: c.text,
     );
 
@@ -76,113 +76,130 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
           widget.label,
           style: GoogleFonts.ibmPlexSansArabic(
             fontWeight: FontWeight.w600,
-            fontSize: 13,
-            color: c.text.withValues(alpha: 0.7),
+            fontSize: 10,
+            color: c.text.withValues(alpha: 0.48),
           ),
         ),
-        const SizedBox(height: 6),
-        RawAutocomplete<String>(
-          textEditingController: widget.controller,
-          focusNode: _focusNode,
-          optionsBuilder: _optionsFor,
-          onSelected: (value) {
-            if (value == widget.addMissingLabel) {
-              // Keep typed custom name; do not replace with the action label.
-              _focusNode.unfocus();
-              return;
-            }
-            widget.controller.text = value;
-            widget.controller.selection =
-                TextSelection.collapsed(offset: value.length);
-            _focusNode.unfocus();
-          },
-          fieldViewBuilder:
-              (context, textController, focusNode, onFieldSubmitted) {
-            return TextFormField(
-              key: widget.fieldKey,
-              controller: textController,
-              focusNode: focusNode,
-              validator: widget.validator,
-              style: textStyle,
-              onFieldSubmitted: (_) => onFieldSubmitted(),
-              decoration: InputDecoration(
-                hintText: widget.hint ?? 'اكتب للبحث أو اختر من القائمة',
-                hintStyle: GoogleFonts.ibmPlexSansArabic(
-                  fontWeight: FontWeight.w400,
-                  fontSize: 14,
-                  color: c.text.withValues(alpha: 0.4),
-                ),
-                suffixIcon: Icon(
-                  Icons.arrow_drop_down,
-                  color: c.text.withValues(alpha: 0.45),
-                ),
-                filled: true,
-                fillColor: c.surface,
-                contentPadding:
-                    const EdgeInsetsDirectional.fromSTEB(12, 12, 12, 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.zero,
-                  borderSide: BorderSide(color: c.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.zero,
-                  borderSide: BorderSide(color: c.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.zero,
-                  borderSide: BorderSide(color: c.primary, width: 1.4),
-                ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.zero,
-                  borderSide: BorderSide(color: c.riderAccent),
-                ),
-              ),
-            );
-          },
-          optionsViewBuilder: (context, onSelected, optionsIterable) {
-            final opts = optionsIterable.toList();
-            if (opts.isEmpty) return const SizedBox.shrink();
-            return Align(
-              alignment: AlignmentDirectional.topStart,
-              child: Material(
-                elevation: 2,
-                color: c.surface,
-                child: ConstrainedBox(
-                  constraints:
-                      const BoxConstraints(maxHeight: 240, minWidth: 280),
-                  child: ListView.separated(
-                    padding: EdgeInsets.zero,
-                    shrinkWrap: true,
-                    itemCount: opts.length,
-                    separatorBuilder: (_, _) =>
-                        Divider(height: 1, color: c.border),
-                    itemBuilder: (context, index) {
-                      final option = opts[index];
-                      final isAdd = option == widget.addMissingLabel;
-                      return InkWell(
-                        onTap: () => onSelected(option),
-                        child: Padding(
-                          padding: const EdgeInsetsDirectional.fromSTEB(
-                            12,
-                            12,
-                            12,
-                            12,
-                          ),
-                          child: Text(
-                            option,
-                            style: GoogleFonts.ibmPlexSansArabic(
-                              fontWeight:
-                                  isAdd ? FontWeight.w600 : FontWeight.w400,
-                              fontSize: 14,
-                              color: isAdd ? c.primary : c.text,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+        const SizedBox(height: 3),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final fieldWidth = constraints.maxWidth;
+            return RawAutocomplete<String>(
+              textEditingController: widget.controller,
+              focusNode: _focusNode,
+              optionsBuilder: _optionsFor,
+              onSelected: (value) {
+                if (value == widget.addMissingLabel) {
+                  _focusNode.unfocus();
+                  return;
+                }
+                widget.controller.text = value;
+                widget.controller.selection =
+                    TextSelection.collapsed(offset: value.length);
+                _focusNode.unfocus();
+              },
+              fieldViewBuilder:
+                  (context, textController, focusNode, onFieldSubmitted) {
+                return TextFormField(
+                  key: widget.fieldKey,
+                  controller: textController,
+                  focusNode: focusNode,
+                  validator: widget.validator,
+                  style: textStyle,
+                  onFieldSubmitted: (_) => onFieldSubmitted(),
+                  decoration: InputDecoration(
+                    hintText: widget.hint ?? 'اكتب أو اختر',
+                    hintStyle: GoogleFonts.ibmPlexSansArabic(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 11,
+                      color: c.text.withValues(alpha: 0.35),
+                    ),
+                    isDense: true,
+                    suffixIcon: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: c.text.withValues(alpha: 0.38),
+                    ),
+                    filled: true,
+                    fillColor: c.surface.withValues(alpha: 0.92),
+                    contentPadding:
+                        const EdgeInsetsDirectional.fromSTEB(8, 6, 4, 6),
+                    border: OutlineInputBorder(
+                      borderRadius: radius,
+                      borderSide:
+                          BorderSide(color: c.border.withValues(alpha: 0.8)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: radius,
+                      borderSide:
+                          BorderSide(color: c.border.withValues(alpha: 0.8)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: radius,
+                      borderSide: BorderSide(
+                        color: c.primary.withValues(alpha: 0.8),
+                      ),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: radius,
+                      borderSide: BorderSide(color: c.riderAccent),
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
+              optionsViewBuilder: (context, onSelected, optionsIterable) {
+                final opts = optionsIterable.toList();
+                if (opts.isEmpty) return const SizedBox.shrink();
+                return Align(
+                  alignment: AlignmentDirectional.topStart,
+                  child: SizedBox(
+                    width: fieldWidth,
+                    child: Material(
+                      elevation: 2,
+                      borderRadius: BorderRadius.circular(8),
+                      color: c.surface,
+                      clipBehavior: Clip.antiAlias,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 180),
+                        child: ListView.separated(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: opts.length,
+                          separatorBuilder: (_, _) => Divider(
+                            height: 1,
+                            color: c.border.withValues(alpha: 0.65),
+                          ),
+                          itemBuilder: (context, index) {
+                            final option = opts[index];
+                            final isAdd = option == widget.addMissingLabel;
+                            return InkWell(
+                              onTap: () => onSelected(option),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 8,
+                                ),
+                                child: Text(
+                                  option,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    fontWeight: isAdd
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                    fontSize: 12,
+                                    color: isAdd ? c.primary : c.text,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
             );
           },
         ),

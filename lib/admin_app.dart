@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/config/admin_config.dart';
+import 'core/pwa/install_prompt_host.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/admin/admin_gate_page.dart';
@@ -32,9 +33,20 @@ class AdminApp extends StatelessWidget {
             GlobalCupertinoLocalizations.delegate,
           ],
           builder: (context, child) {
-            return Directionality(
-              textDirection: TextDirection.rtl,
-              child: child ?? const SizedBox.shrink(),
+            final mq = MediaQuery.of(context);
+            final clamped = mq.copyWith(
+              textScaler: TextScaler.linear(
+                mq.textScaler.scale(1).clamp(0.9, 1.2),
+              ),
+            );
+            return MediaQuery(
+              data: clamped,
+              child: Directionality(
+                textDirection: TextDirection.rtl,
+                child: InstallPromptHost(
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              ),
             );
           },
           home: const AdminGatePage(),

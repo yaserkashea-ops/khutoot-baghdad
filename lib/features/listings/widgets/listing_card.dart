@@ -26,49 +26,54 @@ class ListingCard extends StatelessWidget {
         onTap: onContact,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            // RTL: BorderDirectional.start paints on the right edge.
             border: BorderDirectional(
-              start: BorderSide(color: stripe, width: 4),
+              start: BorderSide(color: stripe, width: 3),
             ),
           ),
           child: Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(14, 14, 14, 14),
+            padding: const EdgeInsetsDirectional.fromSTEB(12, 10, 12, 10),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
                   children: [
                     _TypeBadge(listing: listing),
-                    const Spacer(),
-                    Text(
-                      listing.scheduleLabel,
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 13,
-                        color: c.text.withValues(alpha: 0.7),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        listing.scheduleLabel,
+                        textAlign: TextAlign.end,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.ibmPlexSansArabic(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 11,
+                          color: c.text.withValues(alpha: 0.65),
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Text(
                   '${listing.area} ← ${listing.destination}',
+                  softWrap: true,
                   style: GoogleFonts.ibmPlexSansArabic(
                     fontWeight: FontWeight.w600,
-                    fontSize: 16,
+                    fontSize: 14,
                     color: c.text,
-                    height: 1.35,
+                    height: 1.3,
                   ),
                 ),
                 if (listing.hasRouteSubs) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   _SubRouteRow(listing: listing),
                 ],
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
+                  spacing: 6,
+                  runSpacing: 4,
                   children: [
                     _MetaChip(label: listing.genderLabel),
                     if (listing.isDriver && listing.vehicleType != null)
@@ -80,7 +85,7 @@ class ListingCard extends StatelessWidget {
                       ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 6),
                 Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: TextButton(
@@ -90,9 +95,10 @@ class ListingCard extends StatelessWidget {
                       padding: EdgeInsets.zero,
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
                       textStyle: GoogleFonts.ibmPlexSansArabic(
                         fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                        fontSize: 13,
                       ),
                     ),
                     child: const Text('تواصل'),
@@ -118,16 +124,17 @@ class _TypeBadge extends StatelessWidget {
     final color = listing.isDriver ? c.accent : c.riderAccent;
 
     return Container(
-      padding: const EdgeInsetsDirectional.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        border: Border.all(color: color.withValues(alpha: 0.45)),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
         color: color.withValues(alpha: 0.08),
       ),
       child: Text(
         listing.typeLabel,
         style: GoogleFonts.ibmPlexSansArabic(
           fontWeight: FontWeight.w600,
-          fontSize: 12,
+          fontSize: 11,
           color: color,
         ),
       ),
@@ -135,7 +142,6 @@ class _TypeBadge extends StatelessWidget {
   }
 }
 
-/// Shows secondary from/to points: «نقاط من» ← «نقاط إلى»
 class _SubRouteRow extends StatelessWidget {
   const _SubRouteRow({required this.listing});
 
@@ -144,33 +150,20 @@ class _SubRouteRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final style = GoogleFonts.ibmPlexSansArabic(
-      fontWeight: FontWeight.w400,
-      fontSize: 13,
-      height: 1.45,
-      color: c.text.withValues(alpha: 0.62),
-    );
-    final arrowStyle = GoogleFonts.ibmPlexSansArabic(
-      fontWeight: FontWeight.w600,
-      fontSize: 12,
-      color: c.primary.withValues(alpha: 0.55),
-    );
-
-    final from = listing.originSubs.isEmpty
-        ? '—'
-        : listing.originSubsLabel;
+    final from =
+        listing.originSubs.isEmpty ? '—' : listing.originSubsLabel;
     final to = listing.destinationSubs.isEmpty
         ? '—'
         : listing.destinationSubsLabel;
 
-    return Text.rich(
-      TextSpan(
-        style: style,
-        children: [
-          TextSpan(text: from),
-          TextSpan(text: '  ←  ', style: arrowStyle),
-          TextSpan(text: to),
-        ],
+    return Text(
+      '$from  ←  $to',
+      softWrap: true,
+      style: GoogleFonts.ibmPlexSansArabic(
+        fontWeight: FontWeight.w400,
+        fontSize: 12,
+        height: 1.35,
+        color: c.text.withValues(alpha: 0.58),
       ),
     );
   }
@@ -189,17 +182,21 @@ class _MetaChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      padding: const EdgeInsetsDirectional.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        border: Border.all(color: c.border),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: c.border.withValues(alpha: 0.85)),
       ),
       child: Text(
         label,
         style: useManropeDigits
-            ? AppTheme.manrope(fontSize: 12, color: c.text.withValues(alpha: 0.8))
+            ? AppTheme.manrope(
+                fontSize: 11,
+                color: c.text.withValues(alpha: 0.8),
+              )
             : GoogleFonts.ibmPlexSansArabic(
                 fontWeight: FontWeight.w400,
-                fontSize: 12,
+                fontSize: 11,
                 color: c.text.withValues(alpha: 0.8),
               ),
       ),

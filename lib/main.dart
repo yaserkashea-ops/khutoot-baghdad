@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'admin_app.dart';
 import 'app.dart';
 import 'core/auth/admin_auth_controller.dart';
+import 'core/config/app_hosts.dart';
 import 'core/config/supabase_config.dart';
 import 'core/theme/theme_controller.dart';
 import 'data/admin_repository.dart';
@@ -10,11 +12,16 @@ import 'data/listings_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Hash URLs (#/ and #/admin) work reliably on static hosts.
   await ThemeController.shared.load();
   await AdminAuthController.shared.load();
   await _initSupabase();
-  runApp(const MasaratApp());
+
+  // موقع الإدارة المنفصل يجب أن يفتح لوحة التحكم فقط، حتى لو وُجد index.html.
+  if (AppHosts.isAdminHost) {
+    runApp(const AdminApp());
+  } else {
+    runApp(const MasaratApp());
+  }
 }
 
 Future<void> _initSupabase() async {
