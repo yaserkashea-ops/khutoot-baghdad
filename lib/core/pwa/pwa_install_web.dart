@@ -12,12 +12,13 @@ extension type _PwaApi._(JSObject _) implements JSObject {
   external bool isIos();
   external bool isMobile();
   external void setMode(String mode);
-  external bool ensureAdminHash();`r`n  external bool isAdminEntry();`r`n  external bool openAdminEntry();
+  external bool ensureAdminHash();
+  external bool isAdminEntry();
+  external bool openAdminEntry();
   external JSPromise<JSAny?> promptInstall();
   external JSPromise<JSBoolean> waitForPrompt(JSNumber ms);
 }
 
-/// Web PWA helpers backed by `window.__masaratPwa` in index.html.
 class PwaInstall {
   static final StreamController<void> _controller =
       StreamController<void>.broadcast();
@@ -67,25 +68,41 @@ class PwaInstall {
     }
   }
 
+  static bool get isAdminEntry {
+    try {
+      return _api?.isAdminEntry() ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Stream<void> get onStateChanged {
     _ensureListening();
     return _controller.stream;
   }
 
-  /// `admin` uses manifest-admin (Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…); `app` uses the public app.
   static void setMode(String mode) {
     try {
       _api?.setMode(mode);
     } catch (_) {}
   }
 
-  /// Ensures the URL hash points at `/admin`. Returns true if it navigated.
-  static bool ensureAdminHash() {`r`n    try {`r`n      return _api?.ensureAdminHash() ?? false;`r`n    } catch (_) {`r`n      return false;`r`n    }`r`n  }`r`n`r`n  static bool get isAdminEntry {`r`n    try {`r`n      return _api?.isAdminEntry() ?? false;`r`n    } catch (_) {`r`n      return false;`r`n    }`r`n  }`r`n`r`n  static bool openAdminEntry() {`r`n    try {`r`n      return _api?.openAdminEntry() ?? false;`r`n    } catch (_) {`r`n      return false;`r`n    }`r`n  } catch (_) {
+  static bool ensureAdminHash() {
+    try {
+      return _api?.ensureAdminHash() ?? false;
+    } catch (_) {
       return false;
     }
   }
 
-  /// Wait until the browser exposes its native install prompt.
+  static bool openAdminEntry() {
+    try {
+      return _api?.openAdminEntry() ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<bool> waitForPrompt({
     Duration timeout = const Duration(milliseconds: 2500),
   }) async {
@@ -93,15 +110,13 @@ class PwaInstall {
     if (api == null) return false;
     if (api.canInstall) return true;
     try {
-      final ready =
-          await api.waitForPrompt(timeout.inMilliseconds.toJS).toDart;
+      final ready = await api.waitForPrompt(timeout.inMilliseconds.toJS).toDart;
       return ready.toDart;
     } catch (_) {
       return api.canInstall;
     }
   }
 
-  /// Opens the browser's native install UI. Returns `accepted`, `dismissed`, or `unavailable`.
   static Future<String> promptInstall() async {
     final api = _api;
     if (api == null) return 'unavailable';
@@ -110,4 +125,3 @@ class PwaInstall {
     return (any as JSString).toDart;
   }
 }
-

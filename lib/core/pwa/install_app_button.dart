@@ -6,13 +6,14 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_colors.dart';
 import 'pwa_install.dart';
 
-/// Opens the browser native install UI, with a clear fallback when unavailable.
 Future<void> runInstallAppFlow(
   BuildContext context, {
   bool forAdmin = false,
 }) async {
   if (forAdmin) {
-    // Keep any deferred beforeinstallprompt â€” setMode no-ops if already admin.
+    if (!PwaInstall.isAdminEntry && PwaInstall.openAdminEntry()) {
+      return;
+    }
     PwaInstall.setMode('admin');
   }
 
@@ -39,14 +40,12 @@ Future<void> runInstallAppFlow(
   );
 }
 
-/// Compact AppBar install control â€” icon only.
 class InstallAppIconButton extends StatefulWidget {
   const InstallAppIconButton({
     super.key,
     this.forAdmin = false,
   });
 
-  /// When true, switches to the admin PWA manifest before install.
   final bool forAdmin;
 
   @override
@@ -75,7 +74,6 @@ class _InstallAppIconButtonState extends State<InstallAppIconButton> {
 
   void _refresh() {
     if (!mounted) return;
-    // Admin install stays visible even if the public app is already installed.
     if (widget.forAdmin) {
       setState(() => _show = true);
       return;
@@ -95,8 +93,8 @@ class _InstallAppIconButtonState extends State<InstallAppIconButton> {
 
     final c = context.colors;
     final tip = widget.forAdmin
-        ? 'ØªØ«Ø¨ÙŠØª Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ… Ø¹Ù„Ù‰ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©'
-        : 'ØªØ«Ø¨ÙŠØª Ø¹Ù„Ù‰ Ø§Ù„Ø´Ø§Ø´Ø© Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©';
+        ? 'تثبيت لوحة التحكم على الرئيسية'
+        : 'تثبيت على الشاشة الرئيسية';
     return Tooltip(
       message: tip,
       child: Padding(
@@ -153,6 +151,9 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
       _hint = null;
     });
     if (widget.forAdmin) {
+      if (!PwaInstall.isAdminEntry && PwaInstall.openAdminEntry()) {
+        return;
+      }
       PwaInstall.setMode('admin');
     }
     await PwaInstall.waitForPrompt(
@@ -167,19 +168,16 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
     }
     setState(() {
       _hint = PwaInstall.isIos
-          ? 'Ù…Ù† Safari: Ø²Ø± Ø§Ù„Ù…Ø´Ø§Ø±ÙƒØ© â† Â«Ø¥Ø¶Ø§ÙØ© Ø¥Ù„Ù‰ Ø§Ù„Ø´Ø§Ø´Ø© Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©Â».'
-          : 'Ù…Ù† Chrome: Ø§Ù„Ù‚Ø§Ø¦Ù…Ø© â‹® â† Â«ØªØ«Ø¨ÙŠØª Ø§Ù„ØªØ·Ø¨ÙŠÙ‚Â» Ø£Ùˆ Â«Ø¥Ø¶Ø§ÙØ© Ø¥Ù„Ù‰ Ø§Ù„Ø´Ø§Ø´Ø© Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©Â».';
+          ? 'من Safari: زر المشاركة ثم إضافة إلى الشاشة الرئيسية.'
+          : 'من Chrome: افتح رابط /admin ثم من القائمة اختر تثبيت التطبيق.';
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final label =
-        widget.forAdmin ? 'ØªØ«Ø¨ÙŠØª Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ… Ø§Ù„Ø¢Ù†' : 'ØªØ«Ø¨ÙŠØª Ø§Ù„Ø¢Ù†';
-    final title = widget.forAdmin
-        ? 'ØªØ«Ø¨ÙŠØª Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…'
-        : 'ØªØ«Ø¨ÙŠØª Ø§Ù„ØªØ·Ø¨ÙŠÙ‚';
+    final label = widget.forAdmin ? 'تثبيت لوحة التحكم الآن' : 'تثبيت الآن';
+    final title = widget.forAdmin ? 'تثبيت لوحة التحكم' : 'تثبيت التطبيق';
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
@@ -198,8 +196,8 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
             const SizedBox(height: 8),
             Text(
               widget.forAdmin
-                  ? 'Ø³ÙŠØ¸Ù‡Ø± Ø§Ø®ØªØµØ§Ø± Ø¨Ø§Ø³Ù… Â«ØªØ­ÙƒÙ… Ø®Ø·ÙˆØ·Â» Ø¹Ù„Ù‰ Ø§Ù„Ø´Ø§Ø´Ø© Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©.'
-                  : 'Ø³ÙŠØ¸Ù‡Ø± Ø§Ø®ØªØµØ§Ø± Ø¨Ø§Ø³Ù… Â«Ø®Ø·ÙˆØ· Ø¨ØºØ¯Ø§Ø¯Â» Ø¹Ù„Ù‰ Ø§Ù„Ø´Ø§Ø´Ø© Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©.',
+                  ? 'سيظهر اختصار باسم تحكم خطوط على الشاشة الرئيسية.'
+                  : 'سيظهر اختصار باسم خطوط بغداد على الشاشة الرئيسية.',
               textAlign: TextAlign.center,
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 13,
@@ -253,4 +251,3 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
     );
   }
 }
-
