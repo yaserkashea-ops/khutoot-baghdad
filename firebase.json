@@ -1,4 +1,4 @@
-{
+﻿{
   "hosting": {
     "site": "khutoot-baghdad",
     "public": "build/web",
@@ -8,6 +8,15 @@
       "**/node_modules/**"
     ],
     "rewrites": [
+      {
+        "source": "/admin"
+,
+        "destination": "/admin.html"
+      },
+      {
+        "source": "/admin/**",
+        "destination": "/admin.html"
+      },
       {
         "source": "**",
         "destination": "/index.html"
@@ -34,6 +43,15 @@
       },
       {
         "source": "/index.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "/admin.html",
         "headers": [
           {
             "key": "Cache-Control",

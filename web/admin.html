@@ -1,0 +1,186 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <base href="/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="لوحة تحكم خطوط بغداد — إدارة الإعلانات والاستيراد والبلاغات.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1E4D4A" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1615" media="(prefers-color-scheme: dark)">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="تحكم خطوط">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-512.png">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <title>لوحة تحكم خطوط بغداد</title>
+  <link rel="manifest" href="manifest-admin.json">
+
+  <style>
+    html, body {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #121824;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-text-size-adjust: 100%;
+      touch-action: manipulation;
+    }
+    .masarat-boot {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: #121824;
+      color: #EDE8E0;
+      font-family: system-ui, "Segoe UI", Tahoma, sans-serif;
+      z-index: 9999;
+      transition: opacity 0.25s ease;
+    }
+    .masarat-boot img {
+      width: 88px;
+      height: 88px;
+      border-radius: 18px;
+    }
+    .masarat-boot span {
+      font-size: 18px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="masarat-boot" id="masarat-boot">
+    <img src="icons/Icon-192.png" alt="تحكم خطوط">
+    <span id="masarat-boot-title">تحكم خطوط</span>
+  </div>
+
+  <script>
+    (function () {
+      var CACHE_BUST = 'v7';
+      try {
+        if (sessionStorage.getItem('masarat-admin-cb') !== CACHE_BUST) {
+          sessionStorage.setItem('masarat-admin-cb', CACHE_BUST);
+          var u = new URL(location.href);
+          u.searchParams.set('cb', CACHE_BUST);
+          location.replace(u.toString());
+          return;
+        }
+      } catch (e) {}
+
+      if ((location.hash || '').replace(/^#/, '').indexOf('/admin') !== 0) {
+        location.replace('/admin#/admin');
+        return;
+      }
+
+      const api = {
+        deferred: null,
+        canInstall: false,
+        mode: 'admin',
+        isStandalone: function () {
+          return window.matchMedia('(display-mode: standalone)').matches
+            || window.navigator.standalone === true;
+        },
+        isIos: function () {
+          const ua = window.navigator.userAgent || '';
+          return /iPad|iPhone|iPod/.test(ua)
+            || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        },
+        isMobile: function () {
+          return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
+            || (navigator.maxTouchPoints > 1 && window.innerWidth < 900);
+        },
+        setMode: function () {},
+        ensureAdminHash: function () {
+          var hash = (location.hash || '').replace(/^#/, '');
+          if (hash.indexOf('/admin') === 0) return false;
+          location.hash = '/admin';
+          return true;
+        },
+        isAdminEntry: function () {
+          return /(^|\/)admin(\/|$)/.test(location.pathname || '');
+        },
+        openAdminEntry: function () {
+          if (api.isAdminEntry()) return false;
+          location.assign('/admin');
+          return true;
+        },
+        promptInstall: async function () {
+          if (!api.deferred) return 'unavailable';
+          api.deferred.prompt();
+          const choice = await api.deferred.userChoice;
+          api.deferred = null;
+          api.canInstall = false;
+          window.dispatchEvent(new CustomEvent('masarat-install-state'));
+          return choice.outcome;
+        },
+        waitForPrompt: function (ms) {
+          return new Promise(function (resolve) {
+            if (api.deferred) {
+              resolve(true);
+              return;
+            }
+            var done = false;
+            var timer = setTimeout(function () {
+              if (done) return;
+              done = true;
+              resolve(false);
+            }, ms || 2500);
+            function onState() {
+              if (done) return;
+              if (!api.deferred) return;
+              done = true;
+              clearTimeout(timer);
+              window.removeEventListener('masarat-install-state', onState);
+              resolve(true);
+            }
+            window.addEventListener('masarat-install-state', onState);
+          });
+        }
+      };
+      window.__masaratPwa = api;
+
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        api.deferred = e;
+        api.canInstall = true;
+        window.dispatchEvent(new CustomEvent('masarat-install-state'));
+      });
+
+      window.addEventListener('appinstalled', function () {
+        api.deferred = null;
+        api.canInstall = false;
+        window.dispatchEvent(new CustomEvent('masarat-install-state'));
+      });
+
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('sw.js?v=' + CACHE_BUST).catch(function () {});
+        });
+      }
+
+      window.addEventListener('flutter-first-frame', function () {
+        const el = document.getElementById('masarat-boot');
+        if (!el) return;
+        el.style.opacity = '0';
+        setTimeout(function () { el.remove(); }, 280);
+      });
+      setTimeout(function () {
+        const el = document.getElementById('masarat-boot');
+        if (el) el.remove();
+      }, 8000);
+    })();
+  </script>
+
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

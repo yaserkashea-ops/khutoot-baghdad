@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -12,7 +12,7 @@ Future<void> runInstallAppFlow(
   bool forAdmin = false,
 }) async {
   if (forAdmin) {
-    // Keep any deferred beforeinstallprompt — setMode no-ops if already admin.
+    // Keep any deferred beforeinstallprompt â€” setMode no-ops if already admin.
     PwaInstall.setMode('admin');
   }
 
@@ -39,7 +39,7 @@ Future<void> runInstallAppFlow(
   );
 }
 
-/// Compact AppBar install control — icon only.
+/// Compact AppBar install control â€” icon only.
 class InstallAppIconButton extends StatefulWidget {
   const InstallAppIconButton({
     super.key,
@@ -95,8 +95,8 @@ class _InstallAppIconButtonState extends State<InstallAppIconButton> {
 
     final c = context.colors;
     final tip = widget.forAdmin
-        ? 'تثبيت لوحة التحكم على الرئيسية'
-        : 'تثبيت على الشاشة الرئيسية';
+        ? 'ØªØ«Ø¨ÙŠØª Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ… Ø¹Ù„Ù‰ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©'
+        : 'ØªØ«Ø¨ÙŠØª Ø¹Ù„Ù‰ Ø§Ù„Ø´Ø§Ø´Ø© Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©';
     return Tooltip(
       message: tip,
       child: Padding(
@@ -167,8 +167,8 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
     }
     setState(() {
       _hint = PwaInstall.isIos
-          ? 'من Safari: زر المشاركة ← «إضافة إلى الشاشة الرئيسية».'
-          : 'من Chrome: القائمة ⋮ ← «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».';
+          ? 'Ù…Ù† Safari: Ø²Ø± Ø§Ù„Ù…Ø´Ø§Ø±ÙƒØ© â† Â«Ø¥Ø¶Ø§ÙØ© Ø¥Ù„Ù‰ Ø§Ù„Ø´Ø§Ø´Ø© Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©Â».'
+          : 'Ù…Ù† Chrome: Ø§Ù„Ù‚Ø§Ø¦Ù…Ø© â‹® â† Â«ØªØ«Ø¨ÙŠØª Ø§Ù„ØªØ·Ø¨ÙŠÙ‚Â» Ø£Ùˆ Â«Ø¥Ø¶Ø§ÙØ© Ø¥Ù„Ù‰ Ø§Ù„Ø´Ø§Ø´Ø© Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©Â».';
     });
   }
 
@@ -176,10 +176,10 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final label =
-        widget.forAdmin ? 'تثبيت لوحة التحكم الآن' : 'تثبيت الآن';
+        widget.forAdmin ? 'ØªØ«Ø¨ÙŠØª Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ… Ø§Ù„Ø¢Ù†' : 'ØªØ«Ø¨ÙŠØª Ø§Ù„Ø¢Ù†';
     final title = widget.forAdmin
-        ? 'تثبيت لوحة التحكم'
-        : 'تثبيت التطبيق';
+        ? 'ØªØ«Ø¨ÙŠØª Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…'
+        : 'ØªØ«Ø¨ÙŠØª Ø§Ù„ØªØ·Ø¨ÙŠÙ‚';
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
@@ -198,8 +198,8 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
             const SizedBox(height: 8),
             Text(
               widget.forAdmin
-                  ? 'سيظهر اختصار باسم «تحكم خطوط» على الشاشة الرئيسية.'
-                  : 'سيظهر اختصار باسم «خطوط بغداد» على الشاشة الرئيسية.',
+                  ? 'Ø³ÙŠØ¸Ù‡Ø± Ø§Ø®ØªØµØ§Ø± Ø¨Ø§Ø³Ù… Â«ØªØ­ÙƒÙ… Ø®Ø·ÙˆØ·Â» Ø¹Ù„Ù‰ Ø§Ù„Ø´Ø§Ø´Ø© Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©.'
+                  : 'Ø³ÙŠØ¸Ù‡Ø± Ø§Ø®ØªØµØ§Ø± Ø¨Ø§Ø³Ù… Â«Ø®Ø·ÙˆØ· Ø¨ØºØ¯Ø§Ø¯Â» Ø¹Ù„Ù‰ Ø§Ù„Ø´Ø§Ø´Ø© Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©.',
               textAlign: TextAlign.center,
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 13,
@@ -253,3 +253,4 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
     );
   }
 }
+

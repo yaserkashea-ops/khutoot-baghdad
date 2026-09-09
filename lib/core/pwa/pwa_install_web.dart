@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
@@ -12,7 +12,7 @@ extension type _PwaApi._(JSObject _) implements JSObject {
   external bool isIos();
   external bool isMobile();
   external void setMode(String mode);
-  external bool ensureAdminHash();
+  external bool ensureAdminHash();`r`n  external bool isAdminEntry();`r`n  external bool openAdminEntry();
   external JSPromise<JSAny?> promptInstall();
   external JSPromise<JSBoolean> waitForPrompt(JSNumber ms);
 }
@@ -72,7 +72,7 @@ class PwaInstall {
     return _controller.stream;
   }
 
-  /// `admin` uses manifest-admin (لوحة التحكم); `app` uses the public app.
+  /// `admin` uses manifest-admin (Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…); `app` uses the public app.
   static void setMode(String mode) {
     try {
       _api?.setMode(mode);
@@ -80,10 +80,7 @@ class PwaInstall {
   }
 
   /// Ensures the URL hash points at `/admin`. Returns true if it navigated.
-  static bool ensureAdminHash() {
-    try {
-      return _api?.ensureAdminHash() ?? false;
-    } catch (_) {
+  static bool ensureAdminHash() {`r`n    try {`r`n      return _api?.ensureAdminHash() ?? false;`r`n    } catch (_) {`r`n      return false;`r`n    }`r`n  }`r`n`r`n  static bool get isAdminEntry {`r`n    try {`r`n      return _api?.isAdminEntry() ?? false;`r`n    } catch (_) {`r`n      return false;`r`n    }`r`n  }`r`n`r`n  static bool openAdminEntry() {`r`n    try {`r`n      return _api?.openAdminEntry() ?? false;`r`n    } catch (_) {`r`n      return false;`r`n    }`r`n  } catch (_) {
       return false;
     }
   }
@@ -113,3 +110,4 @@ class PwaInstall {
     return (any as JSString).toDart;
   }
 }
+

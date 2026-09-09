@@ -1,9 +1,9 @@
-{
+﻿{
   "id": "/admin-panel",
   "name": "لوحة تحكم خطوط بغداد",
   "short_name": "تحكم خطوط",
-  "start_url": "./?mode=admin",
-  "scope": "./",
+  "start_url": "/admin",
+  "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "background_color": "#121824",

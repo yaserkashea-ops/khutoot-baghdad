@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/auth/admin_auth_controller.dart';
@@ -41,7 +41,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           content: Text(
-            'تأكيد كلمة المرور غير متطابق',
+            'ØªØ£ÙƒÙŠØ¯ ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± ØºÙŠØ± Ù…ØªØ·Ø§Ø¨Ù‚',
             style: GoogleFonts.ibmPlexSansArabic(),
           ),
         ),
@@ -62,7 +62,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
           behavior: SnackBarBehavior.floating,
           backgroundColor: context.colors.primary,
           content: Text(
-            'تم تحديث بيانات الدخول',
+            'ØªÙ… ØªØ­Ø¯ÙŠØ« Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¯Ø®ÙˆÙ„',
             style: GoogleFonts.ibmPlexSansArabic(
               color: context.colors.onPrimary,
             ),
@@ -75,7 +75,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           content: Text(
-            e is ArgumentError ? e.message.toString() : 'تعذر الحفظ',
+            e is ArgumentError ? e.message.toString() : 'ØªØ¹Ø°Ø± Ø§Ù„Ø­ÙØ¸',
             style: GoogleFonts.ibmPlexSansArabic(),
           ),
         ),
@@ -92,7 +92,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
       padding: const EdgeInsets.all(16),
       children: [
         Text(
-          'قنوات التواصل مع الإدارة',
+          'Ù‚Ù†ÙˆØ§Øª Ø§Ù„ØªÙˆØ§ØµÙ„ Ù…Ø¹ Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©',
           style: GoogleFonts.ibmPlexSansArabic(
             fontWeight: FontWeight.w600,
             fontSize: 16,
@@ -100,7 +100,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'تُستخدم عندما يرسل المستخدم بلاغاً أو شكوى أو مشكلة من التطبيق.',
+          'ØªÙØ³ØªØ®Ø¯Ù… Ø¹Ù†Ø¯Ù…Ø§ ÙŠØ±Ø³Ù„ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø¨Ù„Ø§ØºØ§Ù‹ Ø£Ùˆ Ø´ÙƒÙˆÙ‰ Ø£Ùˆ Ù…Ø´ÙƒÙ„Ø© Ù…Ù† Ø§Ù„ØªØ·Ø¨ÙŠÙ‚.',
           style: GoogleFonts.ibmPlexSansArabic(
             fontSize: 13,
             color: c.text.withValues(alpha: 0.6),
@@ -108,17 +108,17 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         ),
         const SizedBox(height: 16),
         _InfoTile(
-          title: 'واتساب',
+          title: 'ÙˆØ§ØªØ³Ø§Ø¨',
           value: AdminContact.whatsappPhone,
         ),
         const SizedBox(height: 8),
         _InfoTile(
-          title: 'تلغرام',
+          title: 'ØªÙ„ØºØ±Ø§Ù…',
           value: AdminContact.telegram,
         ),
         const SizedBox(height: 24),
         Text(
-          'بيانات الدخول',
+          'Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¯Ø®ÙˆÙ„',
           style: GoogleFonts.ibmPlexSansArabic(
             fontWeight: FontWeight.w600,
             fontSize: 16,
@@ -126,7 +126,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'غيّر البريد وكلمة المرور هنا في أي وقت. تُحفظ محلياً على هذا الجهاز حتى ربط مصادقة خادم لاحقاً.',
+          'ØºÙŠÙ‘Ø± Ø§Ù„Ø¨Ø±ÙŠØ¯ ÙˆÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ù‡Ù†Ø§ ÙÙŠ Ø£ÙŠ ÙˆÙ‚Øª. ØªÙØ­ÙØ¸ Ù…Ø­Ù„ÙŠØ§Ù‹ Ø¹Ù„Ù‰ Ù‡Ø°Ø§ Ø§Ù„Ø¬Ù‡Ø§Ø² Ø­ØªÙ‰ Ø±Ø¨Ø· Ù…ØµØ§Ø¯Ù‚Ø© Ø®Ø§Ø¯Ù… Ù„Ø§Ø­Ù‚Ø§Ù‹.',
           style: GoogleFonts.ibmPlexSansArabic(
             fontSize: 13,
             height: 1.45,
@@ -139,7 +139,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
           keyboardType: TextInputType.emailAddress,
           style: GoogleFonts.ibmPlexSansArabic(),
           decoration: InputDecoration(
-            labelText: 'البريد الإلكتروني',
+            labelText: 'Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ',
             labelStyle: GoogleFonts.ibmPlexSansArabic(),
             filled: true,
             fillColor: c.surface,
@@ -152,7 +152,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
           obscureText: _obscure,
           style: GoogleFonts.manrope(),
           decoration: InputDecoration(
-            labelText: 'كلمة المرور الجديدة',
+            labelText: 'ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø©',
             labelStyle: GoogleFonts.ibmPlexSansArabic(),
             filled: true,
             fillColor: c.surface,
@@ -173,7 +173,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
           obscureText: _obscure,
           style: GoogleFonts.manrope(),
           decoration: InputDecoration(
-            labelText: 'تأكيد كلمة المرور',
+            labelText: 'ØªØ£ÙƒÙŠØ¯ ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±',
             labelStyle: GoogleFonts.ibmPlexSansArabic(),
             filled: true,
             fillColor: c.surface,
@@ -191,14 +191,14 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
               shape: const RoundedRectangleBorder(),
             ),
             child: Text(
-              _saving ? 'جاري الحفظ…' : 'حفظ بيانات الدخول',
+              _saving ? 'Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø­ÙØ¸â€¦' : 'Ø­ÙØ¸ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¯Ø®ÙˆÙ„',
               style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
             ),
           ),
         ),
         const SizedBox(height: 24),
         Text(
-          'تثبيت لوحة التحكم',
+          'ØªØ«Ø¨ÙŠØª Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…',
           style: GoogleFonts.ibmPlexSansArabic(
             fontWeight: FontWeight.w600,
             fontSize: 16,
@@ -206,7 +206,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'أضف اختصاراً على الشاشة الرئيسية يفتح لوحة التحكم مباشرة باسم «تحكم خطوط».',
+          'Ø£Ø¶Ù Ø§Ø®ØªØµØ§Ø±Ø§Ù‹ Ø¹Ù„Ù‰ Ø§Ù„Ø´Ø§Ø´Ø© Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ© ÙŠÙØªØ­ Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ… Ù…Ø¨Ø§Ø´Ø±Ø© Ø¨Ø§Ø³Ù… Â«ØªØ­ÙƒÙ… Ø®Ø·ÙˆØ·Â».',
           style: GoogleFonts.ibmPlexSansArabic(
             fontSize: 13,
             height: 1.5,
@@ -226,7 +226,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
             ),
             icon: const Icon(Icons.app_shortcut_outlined, size: 20),
             label: Text(
-              'تثبيت لوحة التحكم على الرئيسية',
+              'ØªØ«Ø¨ÙŠØª Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ… Ø¹Ù„Ù‰ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©',
               style: GoogleFonts.ibmPlexSansArabic(
                 fontWeight: FontWeight.w600,
               ),
@@ -235,7 +235,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         ),
         const SizedBox(height: 24),
         Text(
-          'المظهر',
+          'Ø§Ù„Ù…Ø¸Ù‡Ø±',
           style: GoogleFonts.ibmPlexSansArabic(
             fontWeight: FontWeight.w600,
             fontSize: 16,
@@ -243,7 +243,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'بدّل من أيقونة القمر/الشمس في الشريط. اضغط مطوّلاً لاختيار نهاري / ليلي / حسب النظام.',
+          'Ø¨Ø¯Ù‘Ù„ Ù…Ù† Ø£ÙŠÙ‚ÙˆÙ†Ø© Ø§Ù„Ù‚Ù…Ø±/Ø§Ù„Ø´Ù…Ø³ ÙÙŠ Ø§Ù„Ø´Ø±ÙŠØ·. Ø§Ø¶ØºØ· Ù…Ø·ÙˆÙ‘Ù„Ø§Ù‹ Ù„Ø§Ø®ØªÙŠØ§Ø± Ù†Ù‡Ø§Ø±ÙŠ / Ù„ÙŠÙ„ÙŠ / Ø­Ø³Ø¨ Ø§Ù„Ù†Ø¸Ø§Ù….',
           style: GoogleFonts.ibmPlexSansArabic(
             fontSize: 13,
             height: 1.5,
@@ -252,7 +252,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         ),
         const SizedBox(height: 24),
         Text(
-          'الرابط المستقل',
+          'Ø§Ù„Ø±Ø§Ø¨Ø· Ø§Ù„Ù…Ø³ØªÙ‚Ù„',
           style: GoogleFonts.ibmPlexSansArabic(
             fontWeight: FontWeight.w600,
             fontSize: 16,
@@ -260,12 +260,12 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         ),
         const SizedBox(height: 8),
         _InfoTile(
-          title: 'مسار لوحة التحكم',
-          value: '#${AdminConfig.path}',
+          title: 'Ù…Ø³Ø§Ø± Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ…',
+          value: '/admin',
         ),
         const SizedBox(height: 8),
         Text(
-          'مثال: https://khutoot-baghdad.web.app/#${AdminConfig.path}',
+          'Ù…Ø«Ø§Ù„: https://khutoot-baghdad.web.app/admin',
           style: GoogleFonts.ibmPlexSansArabic(
             fontSize: 13,
             height: 1.5,
@@ -274,7 +274,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         ),
         const SizedBox(height: 24),
         Text(
-          'ملاحظة',
+          'Ù…Ù„Ø§Ø­Ø¸Ø©',
           style: GoogleFonts.ibmPlexSansArabic(
             fontWeight: FontWeight.w600,
             fontSize: 16,
@@ -282,7 +282,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'البيانات حالياً محلية للتجربة. عند ربط Supabase ستُزامَن الإعلانات والبلاغات مع قاعدة البيانات.',
+          'Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø­Ø§Ù„ÙŠØ§Ù‹ Ù…Ø­Ù„ÙŠØ© Ù„Ù„ØªØ¬Ø±Ø¨Ø©. Ø¹Ù†Ø¯ Ø±Ø¨Ø· Supabase Ø³ØªÙØ²Ø§Ù…ÙŽÙ† Ø§Ù„Ø¥Ø¹Ù„Ø§Ù†Ø§Øª ÙˆØ§Ù„Ø¨Ù„Ø§ØºØ§Øª Ù…Ø¹ Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª.',
           style: GoogleFonts.ibmPlexSansArabic(
             fontSize: 13,
             height: 1.5,
@@ -331,3 +331,4 @@ class _InfoTile extends StatelessWidget {
     );
   }
 }
+
