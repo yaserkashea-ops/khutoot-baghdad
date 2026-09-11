@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/auth/admin_auth_controller.dart';
 import '../../core/config/admin_config.dart';
 import '../../core/pwa/install_app_button.dart';
-import '../../core/pwa/pwa_install.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_toggle_button.dart';
 import 'admin_shell_page.dart';
@@ -26,7 +24,6 @@ class _AdminGatePageState extends State<AdminGatePage> {
   @override
   void initState() {
     super.initState();
-    PwaInstall.setMode('admin');
     _bootstrap();
   }
 
@@ -38,7 +35,7 @@ class _AdminGatePageState extends State<AdminGatePage> {
       _goShell();
       return;
     }
-    _email.text = auth.email;
+    if (auth.email.isNotEmpty) _email.text = auth.email;
   }
 
   @override
@@ -69,19 +66,21 @@ class _AdminGatePageState extends State<AdminGatePage> {
       _goShell();
       return;
     }
-    setState(() => _error = 'البريد أو كلمة المرور غير صحيحة');
+    setState(() {
+      _error = AdminAuthController.shared.lastError ??
+          'البريد أو كلمة المرور غير صحيحة';
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: Text(
-          'دخول الإدارة',
-          style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
-        ),
+        title: const Text('دخول الإدارة'),
         actions: const [
           InstallAppIconButton(forAdmin: true),
           ThemeToggleButton(),
@@ -91,99 +90,51 @@ class _AdminGatePageState extends State<AdminGatePage> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
                   AdminConfig.title,
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 20,
+                  style: theme.textTheme.titleLarge?.copyWith(
                     color: c.primary,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
-                  'أدخل البريد وكلمة المرور للمتابعة',
+                  'سجّل الدخول بحساب المشرف في Supabase',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    fontSize: 13,
-                    height: 1.45,
-                    color: c.text.withValues(alpha: 0.6),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: c.text.withValues(alpha: 0.55),
+                    height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 48,
-                  child: OutlinedButton.icon(
-                    key: const Key('install_admin_gate_btn'),
-                    onPressed: () => runInstallAppFlow(context, forAdmin: true),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: c.primary,
-                      side: BorderSide(color: c.primary.withValues(alpha: 0.55)),
-                      shape: const RoundedRectangleBorder(),
-                    ),
-                    icon: const Icon(Icons.app_shortcut_outlined, size: 20),
-                    label: Text(
-                      'تثبيت لوحة التحكم على الرئيسية',
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  key: const Key('install_admin_gate_btn'),
+                  onPressed: () => runInstallAppFlow(context, forAdmin: true),
+                  icon: const Icon(Icons.app_shortcut_outlined, size: 18),
+                  label: const Text('تثبيت لوحة التحكم'),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 TextField(
                   controller: _email,
                   keyboardType: TextInputType.emailAddress,
                   autofillHints: const [AutofillHints.email],
                   textInputAction: TextInputAction.next,
-                  style: GoogleFonts.ibmPlexSansArabic(),
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'البريد الإلكتروني',
-                    labelStyle: GoogleFonts.ibmPlexSansArabic(),
-                    filled: true,
-                    fillColor: c.surface,
-                    border: const OutlineInputBorder(
-                      borderRadius: BorderRadius.zero,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.zero,
-                      borderSide: BorderSide(color: c.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.zero,
-                      borderSide: BorderSide(color: c.primary, width: 1.4),
-                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 TextField(
                   controller: _password,
                   obscureText: _obscure,
                   autofillHints: const [AutofillHints.password],
                   onSubmitted: (_) => _submit(),
-                  style: GoogleFonts.manrope(fontSize: 16),
                   decoration: InputDecoration(
                     labelText: 'كلمة المرور',
-                    labelStyle: GoogleFonts.ibmPlexSansArabic(),
-                    filled: true,
-                    fillColor: c.surface,
-                    border: const OutlineInputBorder(
-                      borderRadius: BorderRadius.zero,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.zero,
-                      borderSide: BorderSide(color: c.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.zero,
-                      borderSide: BorderSide(color: c.primary, width: 1.4),
-                    ),
                     suffixIcon: IconButton(
                       onPressed: () => setState(() => _obscure = !_obscure),
                       icon: Icon(
@@ -198,46 +149,24 @@ class _AdminGatePageState extends State<AdminGatePage> {
                   const SizedBox(height: 10),
                   Text(
                     _error!,
-                    style: GoogleFonts.ibmPlexSansArabic(
+                    style: theme.textTheme.bodySmall?.copyWith(
                       color: c.riderAccent,
-                      fontSize: 13,
                     ),
                   ),
                 ],
-                const SizedBox(height: 12),
-                Text(
-                  'للمشرفين فقط — غيّر البريد وكلمة المرور لاحقاً من الإعدادات',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    fontSize: 12,
-                    color: c.text.withValues(alpha: 0.5),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 48,
-                  child: FilledButton(
-                    onPressed: _busy ? null : _submit,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: c.primary,
-                      foregroundColor: c.onPrimary,
-                      shape: const RoundedRectangleBorder(),
-                      textStyle: GoogleFonts.ibmPlexSansArabic(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
-                    ),
-                    child: _busy
-                        ? SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: c.onPrimary,
-                            ),
-                          )
-                        : const Text('دخول'),
-                  ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _busy ? null : _submit,
+                  child: _busy
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: c.onPrimary,
+                          ),
+                        )
+                      : const Text('دخول'),
                 ),
               ],
             ),

@@ -12,18 +12,18 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #121824;
+      background: #02130D;
       color: #EDE8E0;
       font-family: system-ui, "Segoe UI", Tahoma, sans-serif;
       padding: 24px;
       text-align: center;
     }
-    p { opacity: 0.8; line-height: 1.6; }
+    p { opacity: 0.85; line-height: 1.7; max-width: 28rem; }
   </style>
 </head>
 <body>
   <div>
-    <p id="msg">جاري مسح النسخة القديمة وتحميل التحديث…</p>
+    <p id="msg">جاري إصلاح التحديث…</p>
   </div>
   <script>
     (async function () {
@@ -41,12 +41,14 @@
         }
       } catch (e) {}
       try {
-        localStorage.removeItem('masarat-app-version');
-        localStorage.removeItem('masarat-admin-app-version');
+        localStorage.clear();
         sessionStorage.clear();
       } catch (e) {}
-      msg.textContent = 'تم. يتم فتح النسخة الجديدة…';
-      location.replace('/index.html?fresh=' + Date.now());
+      msg.textContent = 'تم الإصلاح. افتح الرابط الآن:';
+      // One redirect only — no reload loops.
+      setTimeout(function () {
+        location.replace('https://khutoot-baghdad.web.app/?v=20&ok=1');
+      }, 400);
     })();
   </script>
 </body>

@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/data/baghdad_places.dart';
 import '../../../core/theme/app_colors.dart';
 
-/// Text field with suggestion list: type to match, or tap to select.
+/// Text field with suggestion list. Free typing is always allowed.
 class SuggestibleTextField extends StatefulWidget {
   const SuggestibleTextField({
     super.key,
@@ -15,6 +15,7 @@ class SuggestibleTextField extends StatefulWidget {
     this.hint,
     this.validator,
     this.addMissingLabel,
+    this.helperText,
   });
 
   final Key? fieldKey;
@@ -24,6 +25,7 @@ class SuggestibleTextField extends StatefulWidget {
   final String? hint;
   final FormFieldValidator<String>? validator;
   final String? addMissingLabel;
+  final String? helperText;
 
   @override
   State<SuggestibleTextField> createState() => _SuggestibleTextFieldState();
@@ -51,12 +53,18 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
     for (final o in widget.options) {
       if (seen.add(o)) pool.add(o);
     }
-    final matched = q.isEmpty
-        ? pool
-        : pool.where((o) => BaghdadPlaces.matchesQuery(o, q)).toList();
-    final add = widget.addMissingLabel;
-    if (add == null) return matched;
-    return [...matched.where((o) => o != add), add];
+    if (q.isEmpty) return pool;
+    return pool.where((o) => BaghdadPlaces.matchesQuery(o, q));
+  }
+
+  void _commitTyped() {
+    final text = widget.controller.text.trim();
+    if (widget.controller.text != text) {
+      widget.controller.text = text;
+      widget.controller.selection =
+          TextSelection.collapsed(offset: text.length);
+    }
+    _focusNode.unfocus();
   }
 
   @override
@@ -80,6 +88,18 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
             color: c.text.withValues(alpha: 0.48),
           ),
         ),
+        if (widget.helperText != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            widget.helperText!,
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontWeight: FontWeight.w400,
+              fontSize: 10,
+              color: c.text.withValues(alpha: 0.42),
+              height: 1.35,
+            ),
+          ),
+        ],
         const SizedBox(height: 3),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -89,10 +109,6 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
               focusNode: _focusNode,
               optionsBuilder: _optionsFor,
               onSelected: (value) {
-                if (value == widget.addMissingLabel) {
-                  _focusNode.unfocus();
-                  return;
-                }
                 widget.controller.text = value;
                 widget.controller.selection =
                     TextSelection.collapsed(offset: value.length);
@@ -106,9 +122,13 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
                   focusNode: focusNode,
                   validator: widget.validator,
                   style: textStyle,
-                  onFieldSubmitted: (_) => onFieldSubmitted(),
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) {
+                    _commitTyped();
+                    onFieldSubmitted();
+                  },
                   decoration: InputDecoration(
-                    hintText: widget.hint ?? 'اكتب أو اختر',
+                    hintText: widget.hint ?? 'اكتب يدوياً أو اختر',
                     hintStyle: GoogleFonts.ibmPlexSansArabic(
                       fontWeight: FontWeight.w400,
                       fontSize: 11,
@@ -171,7 +191,6 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
                           ),
                           itemBuilder: (context, index) {
                             final option = opts[index];
-                            final isAdd = option == widget.addMissingLabel;
                             return InkWell(
                               onTap: () => onSelected(option),
                               child: Padding(
@@ -184,11 +203,9 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.ibmPlexSansArabic(
-                                    fontWeight: isAdd
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
+                                    fontWeight: FontWeight.w400,
                                     fontSize: 12,
-                                    color: isAdd ? c.primary : c.text,
+                                    color: c.text,
                                   ),
                                 ),
                               ),

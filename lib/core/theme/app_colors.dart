@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Brand palette — light and dark variants via [ThemeExtension].
+/// Brand palette aligned with the app icon (deep teal + gold).
 @immutable
 class MasaratColors extends ThemeExtension<MasaratColors> {
   const MasaratColors({
@@ -23,28 +23,28 @@ class MasaratColors extends ThemeExtension<MasaratColors> {
   final Color riderAccent;
   final Color border;
 
-  /// Day — product brief tokens.
+  /// Day — deep teal frame / gold accent from icon.
   static const light = MasaratColors(
-    background: Color(0xFFFAF7F2),
+    background: Color(0xFFF4F8F7),
     surface: Color(0xFFFFFFFF),
-    text: Color(0xFF2B2621),
-    primary: Color(0xFF1E4D4A),
-    onPrimary: Color(0xFFFAF7F2),
-    accent: Color(0xFFC08A2E),
+    text: Color(0xFF102221),
+    primary: Color(0xFF053F3E),
+    onPrimary: Color(0xFFF4F8F7),
+    accent: Color(0xFFC5A059),
     riderAccent: Color(0xFFB5623F),
-    border: Color(0xFFE4DFD5),
+    border: Color(0xFFD5E2E0),
   );
 
-  /// Night — deep teal ink, warm text, lifted accents (no purple/glow).
+  /// Night — icon forest teal, mint actions, gold sparingly.
   static const dark = MasaratColors(
-    background: Color(0xFF0F1615),
-    surface: Color(0xFF1A2221),
-    text: Color(0xFFEDE8E0),
-    primary: Color(0xFF6BA8A2),
-    onPrimary: Color(0xFF0F1615),
-    accent: Color(0xFFD4A354),
+    background: Color(0xFF02130D),
+    surface: Color(0xFF0A2422),
+    text: Color(0xFFF0F5F4),
+    primary: Color(0xFF5FBDB4),
+    onPrimary: Color(0xFF02130D),
+    accent: Color(0xFFD4AF37),
     riderAccent: Color(0xFFC97B5C),
-    border: Color(0xFF2E3A38),
+    border: Color(0xFF1A3532),
   );
 
   @override
@@ -93,12 +93,12 @@ abstract final class AppColors {
   }
 
   /// Light-brief defaults for non-widget / fallback use.
-  static const Color background = Color(0xFFFAF7F2);
-  static const Color primary = Color(0xFF1E4D4A);
-  static const Color text = Color(0xFF2B2621);
-  static const Color accent = Color(0xFFC08A2E);
+  static const Color background = Color(0xFFF4F8F7);
+  static const Color primary = Color(0xFF053F3E);
+  static const Color text = Color(0xFF102221);
+  static const Color accent = Color(0xFFC5A059);
   static const Color riderAccent = Color(0xFFB5623F);
-  static const Color border = Color(0xFFE4DFD5);
+  static const Color border = Color(0xFFD5E2E0);
 }
 
 extension MasaratColorsX on BuildContext {

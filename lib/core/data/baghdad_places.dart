@@ -325,6 +325,17 @@ abstract final class BaghdadPlaces {
   static const addMissingArea = 'منطقتي غير موجودة؟ أضفها';
   static const addMissingDestination = 'وجهتي غير موجودة؟ أضفها';
 
+  /// Option label to pin a freely typed place name.
+  static String pinTypedLabel(String typed) => 'ثبّت «${typed.trim()}»';
+
+  static bool isPinTypedOption(String option) =>
+      option.startsWith('ثبّت «') && option.endsWith('»');
+
+  static String? extractPinnedText(String option) {
+    if (!isPinTypedOption(option)) return null;
+    return option.substring('ثبّت «'.length, option.length - 1);
+  }
+
   /// تطبيع عربي خفيف للمطابقة: أ/إ/آ→ا، ة→ه، ى→ي، وحذف أداة التعريف في البداية.
   static String normalizeArabic(String input) {
     var s = input.trim();

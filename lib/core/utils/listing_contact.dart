@@ -2,6 +2,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/listing.dart';
 
+class ContactOption {
+  const ContactOption({required this.label, required this.url});
+
+  final String label;
+  final String url;
+}
+
 /// Opens WhatsApp or Telegram for a listing contact.
 abstract final class ListingContact {
   static String? whatsappUrl(String? rawPhone) {
@@ -21,16 +28,17 @@ abstract final class ListingContact {
     return 'https://t.me/$user';
   }
 
-  /// Prefer WhatsApp, then Telegram. Returns false if nothing to open.
-  static Future<bool> open(Listing listing) async {
+  /// Available channels for this listing (caller shows chooser when > 1).
+  static List<ContactOption> optionsFor(Listing listing) {
+    final out = <ContactOption>[];
     final wa = whatsappUrl(listing.contactPhone);
-    if (wa != null) {
-      return launchUrl(Uri.parse(wa), mode: LaunchMode.externalApplication);
-    }
+    if (wa != null) out.add(ContactOption(label: 'واتساب', url: wa));
     final tg = telegramUrl(listing.contactTelegram);
-    if (tg != null) {
-      return launchUrl(Uri.parse(tg), mode: LaunchMode.externalApplication);
-    }
-    return false;
+    if (tg != null) out.add(ContactOption(label: 'تلغرام', url: tg));
+    return out;
+  }
+
+  static Future<bool> openUrl(String url) {
+    return launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 }

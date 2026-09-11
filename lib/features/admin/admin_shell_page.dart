@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/auth/admin_auth_controller.dart';
 import '../../core/config/admin_config.dart';
@@ -63,7 +62,6 @@ class _AdminShellPageState extends State<AdminShellPage> {
       appBar: AppBar(
         title: Text(
           '${AdminConfig.shortName} — ${_titles[_index]}',
-          style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
@@ -73,7 +71,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
             onPressed: _logout,
             child: Text(
               'خروج',
-              style: GoogleFonts.ibmPlexSansArabic(
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
                 color: c.primary,
               ),

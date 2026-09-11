@@ -106,6 +106,52 @@ abstract final class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: c.surface,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: c.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: c.border.withValues(alpha: 0.9)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: c.primary.withValues(alpha: 0.9)),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: c.riderAccent),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: c.primary,
+          foregroundColor: c.onPrimary,
+          minimumSize: const Size.fromHeight(44),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          textStyle: GoogleFonts.ibmPlexSansArabic(
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: c.primary,
+          minimumSize: const Size.fromHeight(44),
+          side: BorderSide(color: c.primary.withValues(alpha: 0.45)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          textStyle: GoogleFonts.ibmPlexSansArabic(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: c.surface,
@@ -130,6 +176,7 @@ abstract final class AppTheme {
   }
 
   /// Latin / digits (times, counts) — Manrope per brief.
+  /// Pass [context] or [color] so dark mode stays readable.
   static TextStyle manrope({
     double fontSize = 14,
     FontWeight fontWeight = FontWeight.w400,
@@ -140,7 +187,7 @@ abstract final class AppTheme {
       fontSize: fontSize,
       fontWeight: fontWeight,
       color: color ??
-          (context != null ? AppColors.of(context).text : MasaratColors.light.text),
+          (context != null ? AppColors.of(context).text : null),
     );
   }
 }

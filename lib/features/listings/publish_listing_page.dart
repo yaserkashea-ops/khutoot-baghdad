@@ -9,17 +9,21 @@ import '../../core/theme/app_theme.dart';
 import '../../data/listings_repository.dart';
 import 'widgets/suggestible_text_field.dart';
 
-/// Publish / edit form. One listing per phone → duplicate opens edit mode.
+/// Publish / edit form for transit listings.
 class PublishListingPage extends StatefulWidget {
   const PublishListingPage({
     super.key,
     required this.repository,
     this.initial,
+    this.initialType,
     this.draftOnly = false,
   });
 
   final ListingsRepository repository;
   final Listing? initial;
+
+  /// Preferred type when opening a blank form (from publish chooser).
+  final ListingType? initialType;
 
   /// When true, save returns the [Listing] via `Navigator.pop` without writing to the repo.
   final bool draftOnly;
@@ -58,7 +62,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
   void initState() {
     super.initState();
     final initial = widget.initial;
-    _type = initial?.type ?? ListingType.driver;
+    _type = initial?.type ?? widget.initialType ?? ListingType.driver;
     _gender = initial?.genderRequirement ?? GenderRequirement.mixed;
     _timePeriod = initial?.timePeriod;
     _editingId = widget.draftOnly ? null : initial?.id;
@@ -109,25 +113,6 @@ class _PublishListingPageState extends State<PublishListingPage> {
     super.dispose();
   }
 
-  void _fillFrom(Listing listing) {
-    setState(() {
-      _editingId = listing.id;
-      _type = listing.type;
-      _gender = listing.genderRequirement;
-      _timePeriod = listing.timePeriod;
-      _originSubs = List<String>.from(listing.originSubs);
-      _destinationSubs = List<String>.from(listing.destinationSubs);
-      _area.text = listing.area;
-      _destination.text = listing.destination;
-      _departureTime.text = listing.departureTime ?? '';
-      _returnTime.text = listing.returnTime ?? '';
-      _vehicle.text = listing.vehicleType ?? '';
-      _seats.text = listing.seatsCount?.toString() ?? '';
-      _phone.text = listing.contactPhone ?? '';
-      _telegram.text = listing.contactTelegram ?? '';
-    });
-  }
-
   void _addToList(TextEditingController input, List<String> list, void Function(List<String>) assign) {
     final value = input.text.trim();
     if (value.isEmpty) return;
@@ -139,6 +124,20 @@ class _PublishListingPageState extends State<PublishListingPage> {
       assign([...list, value]);
       input.clear();
     });
+  }
+
+  /// Commit any typed sub-place still sitting in the input (without pressing إضافة).
+  void _flushPendingSubs() {
+    final originPending = _originSubInput.text.trim();
+    if (originPending.isNotEmpty && !_originSubs.contains(originPending)) {
+      _originSubs = [..._originSubs, originPending];
+      _originSubInput.clear();
+    }
+    final destPending = _destinationSubInput.text.trim();
+    if (destPending.isNotEmpty && !_destinationSubs.contains(destPending)) {
+      _destinationSubs = [..._destinationSubs, destPending];
+      _destinationSubInput.clear();
+    }
   }
 
   void _removeFromList(String value, List<String> list, void Function(List<String>) assign) {
@@ -153,6 +152,8 @@ class _PublishListingPageState extends State<PublishListingPage> {
   Future<void> _submit() async {
     if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
+
+    _flushPendingSubs();
 
     final phone = _phone.text.trim();
     final telegram = _telegram.text.trim();
@@ -182,37 +183,6 @@ class _PublishListingPageState extends State<PublishListingPage> {
     setState(() => _saving = true);
 
     try {
-      // One listing per phone: if another record exists, switch to edit mode.
-      if (!widget.draftOnly && phone.isNotEmpty && !_isEditing) {
-        final existing = await widget.repository.findByPhone(phone);
-        if (existing != null) {
-          if (!mounted) return;
-          _fillFrom(existing);
-          setState(() => _saving = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            _toast(
-              'لديك إعلان سابق بنفس الرقم — عدّل البيانات ثم احفظ',
-            ),
-          );
-          return;
-        }
-      }
-
-      if (!widget.draftOnly && phone.isNotEmpty && _isEditing) {
-        final existing = await widget.repository.findByPhone(phone);
-        if (existing != null && existing.id != _editingId) {
-          if (!mounted) return;
-          setState(() => _saving = false);
-          _fillFrom(existing);
-          ScaffoldMessenger.of(context).showSnackBar(
-            _toast(
-              'هذا الرقم مرتبط بإعلان آخر — تم فتحه للتعديل',
-            ),
-          );
-          return;
-        }
-      }
-
       final seats = int.tryParse(_seats.text.trim());
       final draft = Listing(
         id: _editingId ?? '',
@@ -325,34 +295,26 @@ class _PublishListingPageState extends State<PublishListingPage> {
               validator: _required,
               options: _knownAreas,
               addMissingLabel: BaghdadPlaces.addMissingArea,
+              hint: 'اكتب أو اختر',
             ),
             const SizedBox(height: 10),
             SuggestibleTextField(
               fieldKey: const Key('field_destination'),
               label: 'الوجهة',
               controller: _destination,
-              hint: 'مثال: اسم الجامعة أو جهة العمل',
+              hint: 'اكتب أو اختر',
               validator: _required,
               options: _knownDestinations,
               addMissingLabel: BaghdadPlaces.addMissingDestination,
             ),
             const SizedBox(height: 12),
             Text('نقاط فرعية داخل المنطقة (من)', style: _sectionLabel(c)),
-            const SizedBox(height: 2),
-            Text(
-              'اختياري — أكثر من نقطة انطلاق داخل المنطقة',
-              style: GoogleFonts.ibmPlexSansArabic(
-                fontWeight: FontWeight.w400,
-                fontSize: 11,
-                color: c.text.withValues(alpha: 0.5),
-              ),
-            ),
             const SizedBox(height: 6),
             SuggestibleTextField(
               fieldKey: const Key('field_origin_sub'),
-              label: 'أضف نقطة انطلاق فرعية',
+              label: 'نقطة انطلاق فرعية',
               controller: _originSubInput,
-              hint: 'مثال: شارع الرواد أو حي دراغ',
+              hint: 'اكتب أو اختر ثم أضف',
               options: _knownAreas,
               addMissingLabel: BaghdadPlaces.addMissingArea,
             ),
@@ -387,21 +349,12 @@ class _PublishListingPageState extends State<PublishListingPage> {
               ),
             const SizedBox(height: 10),
             Text('نقاط فرعية داخل الوجهة (إلى)', style: _sectionLabel(c)),
-            const SizedBox(height: 2),
-            Text(
-              'اختياري — أكثر من نقطة وصول داخل الوجهة',
-              style: GoogleFonts.ibmPlexSansArabic(
-                fontWeight: FontWeight.w400,
-                fontSize: 11,
-                color: c.text.withValues(alpha: 0.5),
-              ),
-            ),
             const SizedBox(height: 6),
             SuggestibleTextField(
               fieldKey: const Key('field_destination_sub'),
-              label: 'أضف نقطة وصول فرعية',
+              label: 'نقطة وصول فرعية',
               controller: _destinationSubInput,
-              hint: 'مثال: جامعة بغداد أو مول الجادرية',
+              hint: 'اكتب أو اختر ثم أضف',
               options: _knownDestinations,
               addMissingLabel: BaghdadPlaces.addMissingDestination,
             ),
@@ -461,7 +414,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
                 controller: _seats,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                style: AppTheme.manrope(fontSize: 14),
+                style: AppTheme.manrope(fontSize: 14, color: c.text),
                 validator: _required,
               ),
             ],
@@ -498,62 +451,91 @@ class _PublishListingPageState extends State<PublishListingPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Text('ساعات الانطلاق والعودة', style: _sectionLabel(c)),
-            const SizedBox(height: 2),
-            Text(
-              'اختياري — اذكر الساعة إن رغبت',
-              style: GoogleFonts.ibmPlexSansArabic(
-                fontWeight: FontWeight.w400,
-                fontSize: 11,
-                color: c.text.withValues(alpha: 0.5),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: _Field(
-                    fieldKey: const Key('field_departure'),
-                    label: 'ساعة الانطلاق',
-                    controller: _departureTime,
-                    hint: '7:30',
-                    style: AppTheme.manrope(fontSize: 14),
+            const SizedBox(height: 12),
+            Theme(
+              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                initiallyExpanded: false,
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 8),
+                leading: Icon(Icons.tune_rounded, color: c.primary, size: 22),
+                title: Text('فلاتر إضافية', style: _sectionLabel(c)),
+                subtitle: Text(
+                  'الجنس · ساعات الانطلاق والعودة (اختياري)',
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 11,
+                    color: c.text.withValues(alpha: 0.5),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _Field(
-                    fieldKey: const Key('field_return'),
-                    label: 'ساعة العودة',
-                    controller: _returnTime,
-                    hint: '2:00',
-                    style: AppTheme.manrope(fontSize: 14),
+                children: [
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text('الجنس المطلوب', style: _sectionLabel(c)),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text('الجنس المطلوب', style: _sectionLabel(c)),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                for (final option in GenderRequirement.values) ...[
-                  if (option != GenderRequirement.values.first)
-                    const SizedBox(width: 6),
-                  Expanded(
-                    child: _ChoiceChip(
-                      label: switch (option) {
-                        GenderRequirement.femaleOnly => 'بنات',
-                        GenderRequirement.maleOnly => 'ذكور',
-                        GenderRequirement.mixed => 'مختلط',
-                      },
-                      selected: _gender == option,
-                      onTap: () => setState(() => _gender = option),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      for (final option in GenderRequirement.values) ...[
+                        if (option != GenderRequirement.values.first)
+                          const SizedBox(width: 6),
+                        Expanded(
+                          child: _ChoiceChip(
+                            label: switch (option) {
+                              GenderRequirement.femaleOnly => 'بنات',
+                              GenderRequirement.maleOnly => 'ذكور',
+                              GenderRequirement.mixed => 'مختلط',
+                            },
+                            selected: _gender == option,
+                            onTap: () => setState(() => _gender = option),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text('ساعات الانطلاق والعودة', style: _sectionLabel(c)),
+                  ),
+                  const SizedBox(height: 2),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      'اختياري — يمكن تركهما فارغين',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontWeight: FontWeight.w400,
+                        fontSize: 11,
+                        color: c.text.withValues(alpha: 0.5),
+                      ),
                     ),
                   ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _Field(
+                          fieldKey: const Key('field_departure'),
+                          label: 'ساعة الانطلاق (اختياري)',
+                          controller: _departureTime,
+                          hint: '7:30',
+                          style: AppTheme.manrope(fontSize: 14, color: c.text),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _Field(
+                          fieldKey: const Key('field_return'),
+                          label: 'ساعة العودة (اختياري)',
+                          controller: _returnTime,
+                          hint: '2:00',
+                          style: AppTheme.manrope(fontSize: 14, color: c.text),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
-              ],
+              ),
             ),
             const SizedBox(height: 14),
             Text('وسيلة التواصل', style: _sectionLabel(c)),
@@ -572,7 +554,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
               label: 'رقم الهاتف',
               controller: _phone,
               keyboardType: TextInputType.phone,
-              style: AppTheme.manrope(fontSize: 14),
+              style: AppTheme.manrope(fontSize: 14, color: c.text),
             ),
             const SizedBox(height: 10),
             _Field(
@@ -580,6 +562,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
               label: 'تلغرام (رابط أو يوزر)',
               controller: _telegram,
               hint: '@user أو https://t.me/...',
+              style: AppTheme.manrope(fontSize: 14, color: c.text),
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -750,12 +733,12 @@ class _Field extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final radius = BorderRadius.circular(8);
-    final textStyle = style ??
+    final base = style ??
         GoogleFonts.ibmPlexSansArabic(
           fontWeight: FontWeight.w400,
           fontSize: 12,
-          color: c.text,
         );
+    final textStyle = base.copyWith(color: style?.color ?? c.text);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

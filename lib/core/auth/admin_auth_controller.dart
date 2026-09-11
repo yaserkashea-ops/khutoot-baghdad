@@ -1,77 +1,102 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../config/admin_config.dart';
-
-/// Local email/password gate + session for the admin panel.
+/// Admin session via Supabase Auth (email + password).
 class AdminAuthController extends ChangeNotifier {
   AdminAuthController._();
 
   static final AdminAuthController shared = AdminAuthController._();
 
-  static const _emailKey = 'masarat_admin_email';
-  static const _passwordKey = 'masarat_admin_password';
-  static const _sessionKey = 'masarat_admin_session';
-
-  String _email = AdminConfig.defaultEmail;
-  String _password = AdminConfig.defaultPassword;
-  bool _signedIn = false;
+  StreamSubscription<AuthState>? _sub;
   bool _loaded = false;
+  String? _lastError;
 
-  String get email => _email;
-  bool get isSignedIn => _signedIn;
+  SupabaseClient? get _client {
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return null;
+    }
+  }
+
   bool get isLoaded => _loaded;
+  bool get isSignedIn => _client?.auth.currentSession != null;
+  String get email => _client?.auth.currentUser?.email?.trim() ?? '';
+  String? get lastError => _lastError;
 
   Future<void> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    _email = prefs.getString(_emailKey) ?? AdminConfig.defaultEmail;
-    _password = prefs.getString(_passwordKey) ?? AdminConfig.defaultPassword;
-    _signedIn = prefs.getBool(_sessionKey) ?? false;
+    await _sub?.cancel();
+    final client = _client;
+    if (client != null) {
+      _sub = client.auth.onAuthStateChange.listen((_) {
+        notifyListeners();
+      });
+    }
     _loaded = true;
     notifyListeners();
   }
 
-  bool validate(String email, String password) {
-    return email.trim().toLowerCase() == _email.trim().toLowerCase() &&
-        password == _password;
-  }
-
   Future<bool> signIn(String email, String password) async {
-    if (!validate(email, password)) return false;
-    _signedIn = true;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_sessionKey, true);
-    notifyListeners();
-    return true;
+    _lastError = null;
+    final client = _client;
+    if (client == null) {
+      _lastError = 'خدمة المصادقة غير جاهزة';
+      notifyListeners();
+      return false;
+    }
+    try {
+      await client.auth.signInWithPassword(
+        email: email.trim(),
+        password: password,
+      );
+      notifyListeners();
+      return true;
+    } on AuthException catch (e) {
+      _lastError = _mapAuthError(e);
+      notifyListeners();
+      return false;
+    } catch (_) {
+      _lastError = 'تعذر تسجيل الدخول. تحقق من الاتصال وحاول مجدداً.';
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> signOut() async {
-    _signedIn = false;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_sessionKey, false);
+    final client = _client;
+    if (client != null) {
+      await client.auth.signOut();
+    }
     notifyListeners();
   }
 
-  /// Change login credentials (stored locally until backend auth is wired).
-  Future<void> updateCredentials({
-    required String email,
-    required String password,
-  }) async {
-    final nextEmail = email.trim();
-    if (nextEmail.isEmpty || password.isEmpty) {
-      throw ArgumentError('البريد وكلمة المرور مطلوبان');
+  Future<void> updatePassword(String newPassword) async {
+    if (newPassword.length < 8) {
+      throw ArgumentError('كلمة المرور يجب أن تكون 8 أحرف على الأقل');
     }
-    if (!nextEmail.contains('@')) {
-      throw ArgumentError('صيغة البريد غير صحيحة');
+    final client = _client;
+    if (client == null) {
+      throw StateError('خدمة المصادقة غير جاهزة');
     }
-    if (password.length < 6) {
-      throw ArgumentError('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+    await client.auth.updateUser(UserAttributes(password: newPassword));
+  }
+
+  String _mapAuthError(AuthException e) {
+    final m = e.message.toLowerCase();
+    if (m.contains('invalid login') || m.contains('invalid credentials')) {
+      return 'البريد أو كلمة المرور غير صحيحة';
     }
-    _email = nextEmail;
-    _password = password;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_emailKey, _email);
-    await prefs.setString(_passwordKey, _password);
-    notifyListeners();
+    if (m.contains('email')) {
+      return 'تحقق من البريد الإلكتروني';
+    }
+    return e.message;
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
   }
 }

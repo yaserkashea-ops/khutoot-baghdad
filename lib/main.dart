@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'admin_app.dart';
@@ -12,12 +13,21 @@ import 'data/listings_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await ThemeController.shared.load();
-  await AdminAuthController.shared.load();
-  await _initSupabase();
 
-  // موقع الإدارة المنفصل يجب أن يفتح لوحة التحكم فقط، حتى لو وُجد index.html.
-  if (AppHosts.isAdminHost) {
+  // Avoid blocking first paint on font CDN when offline / slow network.
+  GoogleFonts.config.allowRuntimeFetching = true;
+
+  final isAdmin = AppHosts.isAdminHost;
+
+  // Theme + Supabase in parallel (was sequential).
+  await Future.wait<void>([
+    ThemeController.shared.load(),
+    _initSupabase(),
+  ]);
+
+  // Admin auth only on the admin host — public app skips this wait.
+  if (isAdmin) {
+    await AdminAuthController.shared.load();
     runApp(const AdminApp());
   } else {
     runApp(const MasaratApp());

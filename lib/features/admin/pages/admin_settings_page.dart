@@ -1,8 +1,6 @@
 ﻿import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/auth/admin_auth_controller.dart';
-import '../../../core/config/admin_config.dart';
 import '../../../core/config/admin_contact.dart';
 import '../../../core/config/app_hosts.dart';
 import '../../../core/pwa/install_app_button.dart';
@@ -16,148 +14,75 @@ class AdminSettingsPage extends StatefulWidget {
 }
 
 class _AdminSettingsPageState extends State<AdminSettingsPage> {
-  final _email = TextEditingController();
   final _password = TextEditingController();
   final _password2 = TextEditingController();
   bool _obscure = true;
   bool _saving = false;
 
   @override
-  void initState() {
-    super.initState();
-    _email.text = AdminAuthController.shared.email;
-  }
-
-  @override
   void dispose() {
-    _email.dispose();
     _password.dispose();
     _password2.dispose();
     super.dispose();
   }
 
-  Future<void> _saveCredentials() async {
+  Future<void> _savePassword() async {
     if (_password.text != _password2.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(
-            'تأكيد كلمة المرور غير متطابق',
-            style: GoogleFonts.ibmPlexSansArabic(),
-          ),
-        ),
-      );
+      _toast('تأكيد كلمة المرور غير متطابق');
       return;
     }
     setState(() => _saving = true);
     try {
-      await AdminAuthController.shared.updateCredentials(
-        email: _email.text,
-        password: _password.text,
-      );
+      await AdminAuthController.shared.updatePassword(_password.text);
       if (!mounted) return;
       _password.clear();
       _password2.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: context.colors.primary,
-          content: Text(
-            'تم تحديث بيانات الدخول',
-            style: GoogleFonts.ibmPlexSansArabic(
-              color: context.colors.onPrimary,
-            ),
-          ),
-        ),
-      );
+      _toast('تم تحديث كلمة المرور', ok: true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(
-            e is ArgumentError ? e.message.toString() : 'تعذر الحفظ',
-            style: GoogleFonts.ibmPlexSansArabic(),
-          ),
-        ),
-      );
+      _toast(e is ArgumentError ? e.message.toString() : 'تعذر الحفظ');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
+  void _toast(String message, {bool ok = false}) {
+    final c = context.colors;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: ok ? c.primary : null,
+        content: Text(message),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final theme = Theme.of(context);
+    final email = AdminAuthController.shared.email;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        Text('الحساب', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 6),
         Text(
-          'قنوات التواصل مع الإدارة',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'تُستخدم عندما يرسل المستخدم بلاغاً أو شكوى أو مشكلة من التطبيق.',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontSize: 13,
-            color: c.text.withValues(alpha: 0.6),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _InfoTile(
-          title: 'واتساب',
-          value: AdminContact.whatsappPhone,
-        ),
-        const SizedBox(height: 8),
-        _InfoTile(
-          title: 'تلغرام',
-          value: AdminContact.telegram,
-        ),
-        const SizedBox(height: 24),
-        Text(
-          'بيانات الدخول',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'غيّر البريد وكلمة المرور هنا في أي وقت. تُحفظ محلياً على هذا الجهاز حتى ربط مصادقة خادم لاحقاً.',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontSize: 13,
+          'المصادقة عبر Supabase Auth. البريد يُدار من لوحة Supabase.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: c.text.withValues(alpha: 0.55),
             height: 1.45,
-            color: c.text.withValues(alpha: 0.65),
           ),
         ),
         const SizedBox(height: 12),
-        TextField(
-          controller: _email,
-          keyboardType: TextInputType.emailAddress,
-          style: GoogleFonts.ibmPlexSansArabic(),
-          decoration: InputDecoration(
-            labelText: 'البريد الإلكتروني',
-            labelStyle: GoogleFonts.ibmPlexSansArabic(),
-            filled: true,
-            fillColor: c.surface,
-            border: const OutlineInputBorder(borderRadius: BorderRadius.zero),
-          ),
-        ),
-        const SizedBox(height: 10),
+        _InfoTile(title: 'البريد الحالي', value: email.isEmpty ? '—' : email),
+        const SizedBox(height: 16),
         TextField(
           controller: _password,
           obscureText: _obscure,
-          style: GoogleFonts.manrope(),
           decoration: InputDecoration(
             labelText: 'كلمة المرور الجديدة',
-            labelStyle: GoogleFonts.ibmPlexSansArabic(),
-            filled: true,
-            fillColor: c.surface,
-            border: const OutlineInputBorder(borderRadius: BorderRadius.zero),
             suffixIcon: IconButton(
               onPressed: () => setState(() => _obscure = !_obscure),
               icon: Icon(
@@ -172,127 +97,52 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         TextField(
           controller: _password2,
           obscureText: _obscure,
-          style: GoogleFonts.manrope(),
-          decoration: InputDecoration(
-            labelText: 'تأكيد كلمة المرور',
-            labelStyle: GoogleFonts.ibmPlexSansArabic(),
-            filled: true,
-            fillColor: c.surface,
-            border: const OutlineInputBorder(borderRadius: BorderRadius.zero),
-          ),
+          decoration: const InputDecoration(labelText: 'تأكيد كلمة المرور'),
         ),
         const SizedBox(height: 12),
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: FilledButton(
-            onPressed: _saving ? null : _saveCredentials,
-            style: FilledButton.styleFrom(
-              backgroundColor: c.primary,
-              foregroundColor: c.onPrimary,
-              shape: const RoundedRectangleBorder(),
-            ),
-            child: Text(
-              _saving ? 'جاري الحفظ…' : 'حفظ بيانات الدخول',
-              style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
-            ),
+            onPressed: _saving ? null : _savePassword,
+            child: Text(_saving ? 'جاري الحفظ…' : 'حفظ كلمة المرور'),
           ),
         ),
-        const SizedBox(height: 24),
-        Text(
-          'تثبيت لوحة التحكم',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-        ),
+        const SizedBox(height: 28),
+        Text('التواصل مع الإدارة', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        _InfoTile(title: 'واتساب', value: AdminContact.whatsappPhone),
+        const SizedBox(height: 8),
+        _InfoTile(title: 'تلغرام', value: AdminContact.telegram),
+        const SizedBox(height: 28),
+        Text('تثبيت لوحة التحكم', style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
         Text(
-          'أضف اختصاراً على الشاشة الرئيسية يفتح لوحة التحكم مباشرة باسم «تحكم خطوط».',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontSize: 13,
-            height: 1.5,
-            color: c.text.withValues(alpha: 0.65),
+          'اختصار على الرئيسية باسم «تحكم خطوط».',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: c.text.withValues(alpha: 0.55),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: FilledButton.icon(
             key: const Key('install_admin_settings_btn'),
             onPressed: () => runInstallAppFlow(context, forAdmin: true),
-            style: FilledButton.styleFrom(
-              backgroundColor: c.primary,
-              foregroundColor: c.onPrimary,
-              shape: const RoundedRectangleBorder(),
-            ),
-            icon: const Icon(Icons.app_shortcut_outlined, size: 20),
-            label: Text(
-              'تثبيت لوحة التحكم على الرئيسية',
-              style: GoogleFonts.ibmPlexSansArabic(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            icon: const Icon(Icons.app_shortcut_outlined, size: 18),
+            label: const Text('تثبيت على الرئيسية'),
           ),
         ),
-        const SizedBox(height: 24),
-        Text(
-          'المظهر',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-        ),
+        const SizedBox(height: 28),
+        Text('الروابط', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        _InfoTile(title: 'الأداة العامة', value: AppHosts.publicUrl),
+        const SizedBox(height: 8),
+        _InfoTile(title: 'لوحة التحكم', value: AppHosts.adminUrl),
         const SizedBox(height: 8),
         Text(
-          'بدّل من أيقونة القمر/الشمس في الشريط. اضغط مطوّلاً لاختيار نهاري / ليلي / حسب النظام.',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontSize: 13,
-            height: 1.5,
-            color: c.text.withValues(alpha: 0.65),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          'الروابط النهائية',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-        ),
-        const SizedBox(height: 8),
-        _InfoTile(
-          title: 'الأداة العامة',
-          value: AppHosts.publicUrl,
-        ),
-        const SizedBox(height: 8),
-        _InfoTile(
-          title: 'لوحة التحكم',
-          value: AppHosts.adminUrl,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'لوحة التحكم على نطاق منفصل حتى تفتح في Chrome وليس داخل تطبيق الأداة المثبت.',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontSize: 13,
-            height: 1.5,
-            color: c.text.withValues(alpha: 0.65),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          'ملاحظة',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'البيانات متزامنة مع قاعدة Supabase عند توفر الاتصال.',
-          style: GoogleFonts.ibmPlexSansArabic(
-            fontSize: 13,
-            height: 1.5,
-            color: c.text.withValues(alpha: 0.65),
+          'نسخة التطبيق ${AppHosts.buildLabel}',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: c.text.withValues(alpha: 0.45),
           ),
         ),
       ],
@@ -309,29 +159,26 @@ class _InfoTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: c.surface,
-        border: Border.all(color: c.border),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: c.border.withValues(alpha: 0.9)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: GoogleFonts.ibmPlexSansArabic(
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-              color: c.text.withValues(alpha: 0.55),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: c.text.withValues(alpha: 0.5),
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            value,
-            style: GoogleFonts.ibmPlexSansArabic(fontSize: 14),
-          ),
+          Text(value, style: theme.textTheme.bodyMedium),
         ],
       ),
     );

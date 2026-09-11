@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/data/supabase_mappers.dart';
 import '../core/models/listing.dart';
+import '../core/utils/phone_digits.dart';
 
 /// Listings store. Uses Supabase when a client is provided, otherwise in-memory.
 class ListingsRepository {
@@ -96,7 +97,7 @@ class ListingsRepository {
       final rows = await _client
           .from('listings')
           .select()
-          .order('updated_at', ascending: false);
+          .order('created_at', ascending: false);
       return List<Listing>.unmodifiable(
         (rows as List)
             .map((e) => ListingMapper.fromRow(Map<String, dynamic>.from(e as Map)))
@@ -107,33 +108,51 @@ class ListingsRepository {
     final copy = List<Listing>.from(_items)
       ..sort((a, b) {
         final aAt =
-            a.updatedAt ?? a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            a.createdAt ?? a.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
         final bAt =
-            b.updatedAt ?? b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            b.createdAt ?? b.updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
         return bAt.compareTo(aAt);
       });
     return List<Listing>.unmodifiable(copy);
   }
 
   Future<Listing?> findByPhone(String phone) async {
-    final trimmed = phone.trim();
-    if (trimmed.isEmpty) return null;
+    final matches = await findAllByPhone(phone);
+    if (matches.isEmpty) return null;
+    return matches.first;
+  }
+
+  /// All listings linked to this phone (normalized digits).
+  Future<List<Listing>> findAllByPhone(String phone) async {
+    if (PhoneDigits.normalize(phone).isEmpty) return const [];
+
     if (_client != null) {
-      final rows = await _client
-          .from('listings')
-          .select()
-          .eq('contact_phone', trimmed)
-          .limit(1);
-      final list = rows as List;
-      if (list.isEmpty) return null;
-      return ListingMapper.fromRow(Map<String, dynamic>.from(list.first as Map));
+      try {
+        final rows = await _client.rpc(
+          'find_listings_by_phone',
+          params: {'p_phone': phone.trim()},
+        );
+        return List<Listing>.unmodifiable(
+          (rows as List)
+              .map(
+                (e) => ListingMapper.fromRow(
+                  Map<String, dynamic>.from(e as Map),
+                ),
+              )
+              .toList(),
+        );
+      } catch (_) {
+        final all = await fetchAll();
+        return List<Listing>.unmodifiable(
+          all.where((l) => PhoneDigits.matches(l.contactPhone, phone)).toList(),
+        );
+      }
     }
+
     await Future<void>.delayed(const Duration(milliseconds: 20));
-    try {
-      return _items.firstWhere((l) => (l.contactPhone ?? '').trim() == trimmed);
-    } catch (_) {
-      return null;
-    }
+    return List<Listing>.unmodifiable(
+      _items.where((l) => PhoneDigits.matches(l.contactPhone, phone)).toList(),
+    );
   }
 
   Future<Listing> insert(Listing listing) async {
@@ -166,6 +185,25 @@ class ListingsRepository {
 
   Future<Listing> update(Listing listing) async {
     if (_client != null) {
+      final phone = listing.contactPhone?.trim() ?? '';
+      if (phone.isNotEmpty) {
+        try {
+          final row = await _client.rpc(
+            'update_listing_by_phone',
+            params: {
+              'p_phone': phone,
+              'p_id': listing.id,
+              'p_data': ListingMapper.toInsert(listing),
+            },
+          );
+          final map = row is Map
+              ? Map<String, dynamic>.from(row)
+              : Map<String, dynamic>.from((row as List).first as Map);
+          return ListingMapper.fromRow(map);
+        } catch (_) {
+          // Fall through to direct update (admin session).
+        }
+      }
       final row = await _client
           .from('listings')
           .update(ListingMapper.toUpdate(listing))
@@ -205,6 +243,36 @@ class ListingsRepository {
       return true;
     }
     final index = _items.indexWhere((l) => l.id == id);
+    if (index < 0) return false;
+    _items.removeAt(index);
+    return true;
+  }
+
+  /// Delete only when [phone] matches the listing owner phone.
+  Future<bool> deleteByPhone({
+    required String id,
+    required String phone,
+  }) async {
+    if (PhoneDigits.normalize(phone).isEmpty) return false;
+
+    if (_client != null) {
+      try {
+        final ok = await _client.rpc(
+          'delete_listing_by_phone',
+          params: {
+            'p_phone': phone.trim(),
+            'p_id': id,
+          },
+        );
+        return ok == true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    final index = _items.indexWhere(
+      (l) => l.id == id && PhoneDigits.matches(l.contactPhone, phone),
+    );
     if (index < 0) return false;
     _items.removeAt(index);
     return true;

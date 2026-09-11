@@ -7,21 +7,21 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="خطوط بغداد — تنظيم إعلانات خطوط النقل المشترك في بغداد.">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
-  <meta name="theme-color" content="#1E4D4A" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0F1615" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#053F3E" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#02130D" media="(prefers-color-scheme: dark)">
   <meta name="format-detection" content="telephone=no">
 
-  <!-- iOS / Android install -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="خطوط بغداد">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
-  <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-512.png">
+  <link rel="apple-touch-icon" href="icons/app-icon-192-v18.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="icons/app-icon-512-v18.png">
 
-  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="icon" type="image/png" href="favicon-v18.png"/>
   <title>خطوط بغداد</title>
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="manifest.json?v=20">
+  <link rel="preload" href="flutter_bootstrap.js?v=20" as="script">
 
   <style>
     html, body {
@@ -30,12 +30,11 @@
       margin: 0;
       padding: 0;
       overflow: hidden;
-      background-color: #121824;
+      background-color: #02130D;
       -webkit-tap-highlight-color: transparent;
       -webkit-text-size-adjust: 100%;
       touch-action: manipulation;
     }
-    /* Loading splash before Flutter boots */
     .masarat-boot {
       position: fixed;
       inset: 0;
@@ -43,77 +42,34 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 12px;
-      background: #121824;
-      color: #EDE8E0;
+      gap: 10px;
+      background: #02130D;
+      color: #F0F5F4;
       font-family: system-ui, "Segoe UI", Tahoma, sans-serif;
       z-index: 9999;
-      transition: opacity 0.25s ease;
+      transition: opacity 0.12s ease;
     }
     .masarat-boot img {
-      width: 88px;
-      height: 88px;
-      border-radius: 18px;
+      width: 64px;
+      height: 64px;
+      border-radius: 14px;
     }
     .masarat-boot span {
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 600;
     }
   </style>
 </head>
 <body>
   <div class="masarat-boot" id="masarat-boot">
-    <img src="icons/Icon-192.png" alt="خطوط بغداد">
+    <img src="favicon-v18.png" width="64" height="64" alt="خطوط بغداد" decoding="async" fetchpriority="high">
     <span id="masarat-boot-title">خطوط بغداد</span>
   </div>
 
   <script>
     (function () {
-      // Bump with every deploy (must match web/sw.js APP_VERSION).
-      var CACHE_BUST = 'v14';
-      var VERSION_KEY = 'masarat-app-version';
+      var CACHE_BUST = 'v20';
       var ADMIN_ORIGIN = 'https://khutoot-baghdad-admin.web.app';
-      var reloading = false;
-
-      function hardReload() {
-        if (reloading) return;
-        reloading = true;
-        var u = new URL(location.href);
-        u.searchParams.set('cb', CACHE_BUST);
-        u.searchParams.set('_', String(Date.now()));
-        location.replace(u.toString());
-      }
-
-      // After each update: wipe old caches/SW so previous sessions die.
-      function enforceFreshSession() {
-        var previous = null;
-        try { previous = localStorage.getItem(VERSION_KEY); } catch (e) {}
-        if (previous === CACHE_BUST) return Promise.resolve(false);
-
-        return Promise.resolve()
-          .then(function () {
-            if (!('caches' in window)) return;
-            return caches.keys().then(function (keys) {
-              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-            });
-          })
-          .then(function () {
-            if (!('serviceWorker' in navigator)) return;
-            return navigator.serviceWorker.getRegistrations().then(function (regs) {
-              return Promise.all(regs.map(function (r) { return r.unregister(); }));
-            });
-          })
-          .then(function () {
-            try { localStorage.setItem(VERSION_KEY, CACHE_BUST); } catch (e) {}
-            hardReload();
-            return true;
-          })
-          .catch(function () {
-            try { localStorage.setItem(VERSION_KEY, CACHE_BUST); } catch (e) {}
-            hardReload();
-            return true;
-          });
-      }
 
       function isAdminIntent() {
         var hash = (location.hash || '').replace(/^#/, '');
@@ -123,14 +79,10 @@
           || /(^|\/)admin(\/|$)/.test(location.pathname || '');
       }
 
-      // Never open the admin panel on the public origin (installed app captures /).
       if (location.origin !== ADMIN_ORIGIN && isAdminIntent()) {
         location.replace(ADMIN_ORIGIN + '/');
         return;
       }
-
-      enforceFreshSession().then(function (reloaded) {
-        if (reloaded) return;
 
       window.addEventListener('hashchange', function () {
         if (location.origin !== ADMIN_ORIGIN && isAdminIntent()) {
@@ -143,7 +95,6 @@
         canInstall: false,
         mode: 'app',
         isStandalone: function () {
-          // Only real home-screen install — do NOT treat minimal-ui (Chrome/Flutter web) as installed.
           return window.matchMedia('(display-mode: standalone)').matches
             || window.navigator.standalone === true;
         },
@@ -216,36 +167,32 @@
         window.dispatchEvent(new CustomEvent('masarat-install-state'));
       });
 
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.addEventListener('controllerchange', function () {
-          try {
-            if (sessionStorage.getItem('masarat-sw-reload') === CACHE_BUST) return;
-            sessionStorage.setItem('masarat-sw-reload', CACHE_BUST);
-          } catch (e) {}
-          hardReload();
-        });
-        window.addEventListener('load', function () {
-          navigator.serviceWorker.register('sw.js?v=' + CACHE_BUST).then(function (reg) {
-            if (reg && reg.update) reg.update().catch(function () {});
-          }).catch(function () {});
-        });
+      function registerSw() {
+        if (!('serviceWorker' in navigator)) return;
+        navigator.serviceWorker.register('sw.js?v=' + CACHE_BUST).catch(function () {});
       }
 
-      // Hide boot splash once Flutter first frame paints (fallback timeout)
+      // Register SW after first frame so it does not compete with Flutter boot.
       window.addEventListener('flutter-first-frame', function () {
         const el = document.getElementById('masarat-boot');
-        if (!el) return;
-        el.style.opacity = '0';
-        setTimeout(function () { el.remove(); }, 280);
+        if (el) {
+          el.style.opacity = '0';
+          setTimeout(function () { el.remove(); }, 120);
+        }
+        if (window.requestIdleCallback) {
+          window.requestIdleCallback(registerSw, { timeout: 2000 });
+        } else {
+          setTimeout(registerSw, 800);
+        }
       });
       setTimeout(function () {
         const el = document.getElementById('masarat-boot');
         if (el) el.remove();
-      }, 8000);
-      }); // end enforceFreshSession
+        registerSw();
+      }, 4000);
     })();
   </script>
 
-  <script src="flutter_bootstrap.js?v=14" async></script>
+  <script src="flutter_bootstrap.js?v=20"></script>
 </body>
 </html>

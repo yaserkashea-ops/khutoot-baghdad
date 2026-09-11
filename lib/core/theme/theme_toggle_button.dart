@@ -82,12 +82,17 @@ class ThemeToggleButton extends StatelessWidget {
       listenable: ThemeController.shared,
       builder: (context, _) {
         final dark = ThemeController.shared.isDarkEffective(context);
-        return IconButton(
-          tooltip: dark ? 'الوضع النهاري' : 'الوضع الليلي',
-          onPressed: () => ThemeController.shared.toggle(context),
-          onLongPress: () => _pickMode(context),
-          icon: Icon(
-            dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+        final label = dark ? 'التبديل إلى الوضع النهاري' : 'التبديل إلى الوضع الليلي';
+        return Semantics(
+          button: true,
+          label: label,
+          child: IconButton(
+            tooltip: dark ? 'الوضع النهاري' : 'الوضع الليلي',
+            onPressed: () => ThemeController.shared.toggle(context),
+            onLongPress: () => _pickMode(context),
+            icon: Icon(
+              dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+            ),
           ),
         );
       },

@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../config/admin_config.dart';
+import '../config/app_hosts.dart';
 import '../theme/app_colors.dart';
 import 'pwa_install.dart';
 
@@ -24,7 +24,7 @@ Future<void> runInstallAppFlow(
   }
 
   final ready = await PwaInstall.waitForPrompt(
-    timeout: const Duration(milliseconds: 4000),
+    timeout: const Duration(milliseconds: 2000),
   );
   if (ready || PwaInstall.canNativeInstall) {
     await PwaInstall.promptInstall();
@@ -158,7 +158,7 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
       PwaInstall.setMode('admin');
     }
     await PwaInstall.waitForPrompt(
-      timeout: const Duration(milliseconds: 4000),
+      timeout: const Duration(milliseconds: 2000),
     );
     final outcome = await PwaInstall.promptInstall();
     if (!mounted) return;
@@ -170,7 +170,7 @@ class _InstallNowSheetState extends State<_InstallNowSheet> {
     setState(() {
       _hint = PwaInstall.isIos
           ? 'من Safari: زر المشاركة ثم إضافة إلى الشاشة الرئيسية.'
-          : 'من Chrome: افتح ${AdminConfig.publicOrigin} ثم من القائمة اختر تثبيت التطبيق.';
+          : 'من Chrome: افتح ${AppHosts.publicOrigin} ثم من القائمة اختر تثبيت التطبيق.';
     });
   }
 

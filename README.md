@@ -2,35 +2,43 @@
 
 تنظيم إعلانات خطوط النقل المشترك في بغداد.
 
-## الروابط النهائية
+## الروابط (v20)
 
 | الخدمة | الرابط |
 |---|---|
 | الأداة العامة | https://khutoot-baghdad.web.app |
 | لوحة التحكم | https://khutoot-baghdad-admin.web.app |
-| تصفير الكاش (عند عدم ظهور التحديث) | https://khutoot-baghdad.web.app/reset.html |
+| تصفير الكاش / تحديث الأيقونة | https://khutoot-baghdad.web.app/reset.html |
+| رابط مباشر محدّث | https://khutoot-baghdad.web.app/?v=20 |
 
-ملاحظات:
-- `https://khutoot-baghdad-app.web.app` يحوّل تلقائياً إلى الرابط العام أعلاه.
-- `/admin` على الموقع العام يحوّل إلى موقع لوحة التحكم.
+`khutoot-baghdad-app.web.app` يحوّل إلى الأداة العامة.
 
-## المستودع
+## ما الجديد (v18–v20)
 
-https://github.com/yaserkashea-ops/khutoot-baghdad
+- أيقونة التطبيق الجديدة (سيارة + قوس بغداد) مع ألوان تركواز/ذهبي متناسقة
+- مشاركة نظامية احترافية (قائمة النظام أو «مشاركة عبر» متعددة التطبيقات)
+- إقلاع أسرع: تهيئة متوازية، شاشة إقلاع أخف، تأجيل Service Worker
+- واجهة بحث أولاً، ترتيب الأحدث أولاً، نشر متكرر مسموح
 
-## الخدمات المتصلة
+## إعداد مشرف جديد (مرة واحدة)
 
-| الخدمة | الحالة |
+1. في Supabase → **Authentication** → **Users** → أضف مستخدماً (بريد + كلمة مرور)
+2. نفّذ SQL المحدّث من `supabase/schema.sql` في SQL Editor
+3. ادخل لوحة التحكم بذلك البريد وكلمة المرور
+
+## الخدمات المرتبطة
+
+| الخدمة | التفاصيل |
 |---|---|
-| **Firebase Hosting** | مشروع `khutoot-baghdad-app` — مواقع: `khutoot-baghdad` + `khutoot-baghdad-admin` + تحويل `khutoot-baghdad-app` |
-| **Supabase** | مشروع `plqhpbtkgforuvqferou` — جداول `listings` و `admin_reports` (انظر `supabase/schema.sql`) |
-| **GitHub** | المستودع أعلاه |
+| Firebase Hosting | مشروع `khutoot-baghdad-app` — مواقع `main` / `admin` / `app` |
+| Supabase | `plqhpbtkgforuvqferou` — `listings` + `admin_reports` + Auth |
+| GitHub | https://github.com/yaserkashea-ops/khutoot-baghdad |
 
-### نشر الويب
+## نشر
 
 ```bash
-flutter build web --release
+flutter build web --release --tree-shake-icons
 firebase deploy --only hosting:main,hosting:app,hosting:admin --project khutoot-baghdad-app
 ```
 
-بعد كل نشر مهم: ارفع رقم الإصدار في `web/index.html` و `web/admin.html` و `web/sw.js` و `web/version.json` معاً.
+ارفع رقم الإصدار معاً في: `web/index.html`, `web/admin.html`, `web/sw.js`, `web/version.json`, و`AppHosts.buildLabel`.
