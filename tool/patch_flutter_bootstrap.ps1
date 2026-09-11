@@ -5,15 +5,20 @@ if (-not (Test-Path $bootstrap)) {
   Write-Error "Missing $bootstrap — run flutter build web first."
   exit 1
 }
-$text = Get-Content -Path $bootstrap -Raw -Encoding UTF8
-$patched = [regex]::Replace(
-  $text,
-  '_flutter\.loader\.load\(\{[\s\S]*?\}\);',
-  '_flutter.loader.load({});'
-)
+$path = (Resolve-Path $bootstrap).Path
+$text = [IO.File]::ReadAllText($path)
+$pattern = '(?s)_flutter\.loader\.load\(\{\s*serviceWorkerSettings:[\s\S]*?\}\);'
+$patched = [regex]::Replace($text, $pattern, '_flutter.loader.load({});')
 if ($patched -eq $text) {
-  Write-Host "flutter_bootstrap.js: no loader block matched (already patched?)"
-} else {
-  Set-Content -Path $bootstrap -Value $patched -Encoding UTF8 -NoNewline
-  Write-Host "flutter_bootstrap.js: disabled Flutter service worker"
+  $patched = [regex]::Replace(
+    $text,
+    '(?s)serviceWorkerSettings:\s*\{[^}]*\}',
+    'serviceWorkerSettings: null'
+  )
 }
+if ($patched -eq $text) {
+  Write-Host "flutter_bootstrap.js: WARNING — could not disable Flutter SW"
+  exit 1
+}
+[IO.File]::WriteAllText($path, $patched)
+Write-Host "flutter_bootstrap.js: disabled Flutter service worker"
