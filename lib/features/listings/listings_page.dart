@@ -180,16 +180,16 @@ class _ListingsPageState extends State<ListingsPage> {
                 const SizedBox(height: 16),
                 _PublishChoiceTile(
                   icon: Icons.person_search_outlined,
-                  title: 'أبحث عن مقعد',
-                  subtitle: 'راكب يريد الانضمام لخط',
+                  title: 'ابحث عن خط',
+                  subtitle: 'انشر أنك تبحث عن خط للنقل',
                   color: c.riderAccent,
                   onTap: () => Navigator.pop(ctx, ListingType.rider),
                 ),
                 const SizedBox(height: 10),
                 _PublishChoiceTile(
                   icon: Icons.directions_car_outlined,
-                  title: 'لدي مقاعد متاحة',
-                  subtitle: 'سائق يعرض خطاً',
+                  title: 'سائق لديه خط',
+                  subtitle: 'انشر خطاً لديك مقاعد فيه',
                   color: c.accent,
                   onTap: () => Navigator.pop(ctx, ListingType.driver),
                 ),
@@ -531,8 +531,8 @@ class _ListingTypeFilter extends StatelessWidget {
     final c = context.colors;
     final options = <(ListingType? value, String label)>[
       (null, 'الكل'),
-      (ListingType.driver, 'سائقون'),
-      (ListingType.rider, 'راكبون'),
+      (ListingType.driver, 'سائق لديه خط'),
+      (ListingType.rider, 'يبحث عن خط'),
     ];
 
     return Column(

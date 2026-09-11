@@ -46,18 +46,27 @@ class AdminAuthController extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    final cleanedEmail = email.trim().toLowerCase();
+    final cleanedPassword = password.trim();
+    if (cleanedEmail.isEmpty || cleanedPassword.isEmpty) {
+      _lastError = 'أدخل البريد وكلمة المرور';
+      notifyListeners();
+      return false;
+    }
     try {
       await client.auth.signInWithPassword(
-        email: email.trim(),
-        password: password,
+        email: cleanedEmail,
+        password: cleanedPassword,
       );
       notifyListeners();
       return true;
     } on AuthException catch (e) {
+      debugPrint('Admin sign-in AuthException: ${e.statusCode} ${e.code} ${e.message}');
       _lastError = _mapAuthError(e);
       notifyListeners();
       return false;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Admin sign-in error: $e');
       _lastError = 'تعذر تسجيل الدخول. تحقق من الاتصال وحاول مجدداً.';
       notifyListeners();
       return false;
@@ -85,8 +94,16 @@ class AdminAuthController extends ChangeNotifier {
 
   String _mapAuthError(AuthException e) {
     final m = e.message.toLowerCase();
-    if (m.contains('invalid login') || m.contains('invalid credentials')) {
-      return 'البريد أو كلمة المرور غير صحيحة';
+    final code = (e.code ?? '').toLowerCase();
+    if (code.contains('email_not_confirmed') ||
+        m.contains('email not confirmed') ||
+        m.contains('not confirmed')) {
+      return 'البريد غير مؤكَّد. من Supabase → Authentication → Users افتح المستخدم وفعّل Confirm email أو أعد إنشاءه مع تفعيل Auto Confirm User.';
+    }
+    if (code.contains('invalid_credentials') ||
+        m.contains('invalid login') ||
+        m.contains('invalid credentials')) {
+      return 'البريد أو كلمة المرور غير صحيحة. تأكد أن المستخدم موجود في Authentication → Users لنفس مشروع خطوط بغداد.';
     }
     if (m.contains('email')) {
       return 'تحقق من البريد الإلكتروني';

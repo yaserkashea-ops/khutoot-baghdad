@@ -80,7 +80,7 @@ class Listing {
         GenderRequirement.mixed => 'مختلط',
       };
 
-  String get typeLabel => isDriver ? 'سائق' : 'راكب';
+  String get typeLabel => isDriver ? 'سائق لديه خط' : 'يبحث عن خط';
 
   Listing copyWith({
     String? id,

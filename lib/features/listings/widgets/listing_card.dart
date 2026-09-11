@@ -16,11 +16,11 @@ class ListingCard extends StatelessWidget {
   final VoidCallback? onContact;
 
   String get _typeTitle => listing.isDriver
-      ? 'سائق لديه مقاعد'
-      : 'راكب يبحث عن مقعد';
+      ? 'سائق لديه خط'
+      : 'يبحث عن خط';
 
   String get _contactLabel =>
-      listing.isDriver ? 'تواصل مع السائق' : 'تواصل مع الراكب';
+      listing.isDriver ? 'تواصل مع السائق' : 'تواصل';
 
   String get _subsLine {
     final from =
@@ -213,14 +213,25 @@ class ListingCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final label in _footerChips)
-                        _MetaChip(label: label),
-                    ],
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SizedBox(
+                        width: constraints.maxWidth,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (var i = 0; i < _footerChips.length; i++) ...[
+                                if (i > 0) const SizedBox(width: 4),
+                                _MetaChip(label: _footerChips[i]),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -241,17 +252,20 @@ class _MetaChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(7),
         border: Border.all(color: c.border),
         color: c.background.withValues(alpha: 0.55),
       ),
       child: Text(
         label,
+        maxLines: 1,
+        softWrap: false,
         style: GoogleFonts.ibmPlexSansArabic(
-          fontWeight: FontWeight.w400,
-          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          fontSize: 10.5,
+          height: 1.2,
           color: c.text.withValues(alpha: 0.85),
         ),
       ),

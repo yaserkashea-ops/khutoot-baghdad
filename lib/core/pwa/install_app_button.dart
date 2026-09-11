@@ -75,10 +75,6 @@ class _InstallAppIconButtonState extends State<InstallAppIconButton> {
 
   void _refresh() {
     if (!mounted) return;
-    if (widget.forAdmin) {
-      setState(() => _show = true);
-      return;
-    }
     var standalone = false;
     try {
       standalone = PwaInstall.isStandalone;

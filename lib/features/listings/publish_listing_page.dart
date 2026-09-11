@@ -270,7 +270,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
               children: [
                 Expanded(
                   child: _TypeToggle(
-                    label: 'سائق يعرض خطاً',
+                    label: 'سائق لديه خط',
                     selected: _type == ListingType.driver,
                     accent: c.accent,
                     onTap: () => setState(() => _type = ListingType.driver),
@@ -279,7 +279,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _TypeToggle(
-                    label: 'راكب يطلب خطاً',
+                    label: 'ابحث عن خط',
                     selected: _type == ListingType.rider,
                     accent: c.riderAccent,
                     onTap: () => setState(() => _type = ListingType.rider),

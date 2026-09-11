@@ -3,7 +3,6 @@
 import '../../../core/auth/admin_auth_controller.dart';
 import '../../../core/config/admin_contact.dart';
 import '../../../core/config/app_hosts.dart';
-import '../../../core/pwa/install_app_button.dart';
 import '../../../core/theme/app_colors.dart';
 
 class AdminSettingsPage extends StatefulWidget {
@@ -113,25 +112,6 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         _InfoTile(title: 'واتساب', value: AdminContact.whatsappPhone),
         const SizedBox(height: 8),
         _InfoTile(title: 'تلغرام', value: AdminContact.telegram),
-        const SizedBox(height: 28),
-        Text('تثبيت لوحة التحكم', style: theme.textTheme.titleMedium),
-        const SizedBox(height: 8),
-        Text(
-          'اختصار على الرئيسية باسم «تحكم خطوط».',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: c.text.withValues(alpha: 0.55),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: FilledButton.icon(
-            key: const Key('install_admin_settings_btn'),
-            onPressed: () => runInstallAppFlow(context, forAdmin: true),
-            icon: const Icon(Icons.app_shortcut_outlined, size: 18),
-            label: const Text('تثبيت على الرئيسية'),
-          ),
-        ),
         const SizedBox(height: 28),
         Text('الروابط', style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),

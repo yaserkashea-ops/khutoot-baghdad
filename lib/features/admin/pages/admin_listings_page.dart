@@ -148,13 +148,13 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
                   ),
                   const SizedBox(width: 8),
                   _FilterChip(
-                    label: 'سائق',
+                    label: 'سائق لديه خط',
                     selected: _typeFilter == 'driver',
                     onTap: () => setState(() => _typeFilter = 'driver'),
                   ),
                   const SizedBox(width: 8),
                   _FilterChip(
-                    label: 'راكب',
+                    label: 'يبحث عن خط',
                     selected: _typeFilter == 'rider',
                     onTap: () => setState(() => _typeFilter = 'rider'),
                   ),

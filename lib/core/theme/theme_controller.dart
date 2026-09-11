@@ -9,7 +9,7 @@ class ThemeController extends ChangeNotifier {
 
   static const _prefsKey = 'masarat_theme_mode';
 
-  ThemeMode _mode = ThemeMode.system;
+  ThemeMode _mode = ThemeMode.light;
   bool _loaded = false;
 
   ThemeMode get mode => _mode;
@@ -22,7 +22,7 @@ class ThemeController extends ChangeNotifier {
       'light' => ThemeMode.light,
       'dark' => ThemeMode.dark,
       'system' => ThemeMode.system,
-      _ => ThemeMode.system,
+      _ => ThemeMode.light,
     };
     _loaded = true;
     notifyListeners();

@@ -110,27 +110,26 @@ class _AdminGatePageState extends State<AdminGatePage> {
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 14),
-                OutlinedButton.icon(
-                  key: const Key('install_admin_gate_btn'),
-                  onPressed: () => runInstallAppFlow(context, forAdmin: true),
-                  icon: const Icon(Icons.app_shortcut_outlined, size: 18),
-                  label: const Text('تثبيت لوحة التحكم'),
-                ),
                 const SizedBox(height: 18),
                 TextField(
                   controller: _email,
                   keyboardType: TextInputType.emailAddress,
+                  textCapitalization: TextCapitalization.none,
+                  autocorrect: false,
+                  enableSuggestions: false,
                   autofillHints: const [AutofillHints.email],
                   textInputAction: TextInputAction.next,
                   decoration: const InputDecoration(
                     labelText: 'البريد الإلكتروني',
+                    hintText: 'name@example.com',
                   ),
                 ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: _password,
                   obscureText: _obscure,
+                  autocorrect: false,
+                  enableSuggestions: false,
                   autofillHints: const [AutofillHints.password],
                   onSubmitted: (_) => _submit(),
                   decoration: InputDecoration(

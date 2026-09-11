@@ -68,13 +68,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 onTap: () => widget.onOpenTab(1),
               ),
               _StatCard(
-                title: 'سائق',
+                title: 'سائق لديه خط',
                 value: '${s.drivers}',
                 accent: c.accent,
                 onTap: () => widget.onOpenTab(1),
               ),
               _StatCard(
-                title: 'راكب',
+                title: 'يبحث عن خط',
                 value: '${s.riders}',
                 accent: c.riderAccent,
                 onTap: () => widget.onOpenTab(1),

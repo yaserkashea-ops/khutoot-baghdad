@@ -33,8 +33,8 @@ void main() {
     await tester.tap(find.byType(FloatingActionButton));
     await tester.pumpAndSettle();
 
-    expect(find.text('أبحث عن مقعد'), findsOneWidget);
-    await tester.tap(find.text('لدي مقاعد متاحة'));
+    expect(find.text('ابحث عن خط'), findsOneWidget);
+    await tester.tap(find.text('سائق لديه خط'));
     await tester.pumpAndSettle();
 
     expect(find.text('نشر إعلان'), findsWidgets);
