@@ -19,8 +19,8 @@
 
   <link rel="icon" type="image/png" href="favicon-v18.png"/>
   <title>لوحة تحكم خطوط بغداد</title>
-  <link rel="manifest" href="manifest-admin.json?v=27">
-  <link rel="preload" href="flutter_bootstrap.js?v=27" as="script">
+  <link rel="manifest" href="manifest-admin.json">
+  <link rel="preload" href="flutter_bootstrap.js" as="script">
 
   <style>
     html, body {
@@ -67,7 +67,45 @@
 
   <script>
     (function () {
-      var CACHE_BUST = 'v27';
+      var CACHE_BUST = 'v28';
+      var VERSION_KEY = 'khutoot_admin_build';
+
+      (async function ensureFreshBuild() {
+        try {
+          if ('serviceWorker' in navigator) {
+            var regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(function (r) {
+              var url = (r.active && r.active.scriptURL) ||
+                (r.waiting && r.waiting.scriptURL) ||
+                (r.installing && r.installing.scriptURL) || '';
+              if (url.indexOf('flutter_service_worker') !== -1) {
+                return r.unregister();
+              }
+              return Promise.resolve();
+            }));
+          }
+          var res = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+          var data = await res.json();
+          var remote = (data && data.version) || '';
+          var local = localStorage.getItem(VERSION_KEY) || '';
+          if (remote && local && remote !== local && !sessionStorage.getItem('khutoot_admin_reloading')) {
+            sessionStorage.setItem('khutoot_admin_reloading', '1');
+            if ('caches' in window) {
+              var keys = await caches.keys();
+              await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+            }
+            if ('serviceWorker' in navigator) {
+              var all = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(all.map(function (r) { return r.unregister(); }));
+            }
+            localStorage.setItem(VERSION_KEY, remote);
+            location.reload();
+            return;
+          }
+          if (remote) localStorage.setItem(VERSION_KEY, remote);
+          sessionStorage.removeItem('khutoot_admin_reloading');
+        } catch (_) {}
+      })();
 
       const api = {
         deferred: null,
@@ -169,6 +207,6 @@
     })();
   </script>
 
-  <script src="flutter_bootstrap.js?v=27"></script>
+  <script src="flutter_bootstrap.js"></script>
 </body>
 </html>

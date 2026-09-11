@@ -2,14 +2,15 @@
 
 تنظيم إعلانات خطوط النقل المشترك في بغداد.
 
-## الروابط (v20)
+## الروابط
 
 | الخدمة | الرابط |
 |---|---|
 | الأداة العامة | https://khutoot-baghdad.web.app |
 | لوحة التحكم | https://khutoot-baghdad-admin.web.app |
-| تصفير الكاش / تحديث الأيقونة | https://khutoot-baghdad.web.app/reset.html |
-| رابط مباشر محدّث | https://khutoot-baghdad.web.app/?v=20 |
+| تصفير الكاش (نادراً) | https://khutoot-baghdad.web.app/reset.html |
+
+الروابط ثابتة: بعد كل نشر تصل التحديثات تلقائياً لنفس العنوان (فحص `version.json` + تعطيل Flutter SW).
 
 `khutoot-baghdad-app.web.app` يحوّل إلى الأداة العامة.
 
@@ -38,7 +39,9 @@
 
 ```bash
 flutter build web --release --tree-shake-icons
+powershell -ExecutionPolicy Bypass -File tool/patch_flutter_bootstrap.ps1
 firebase deploy --only hosting:main,hosting:app,hosting:admin --project khutoot-baghdad-app
 ```
 
 ارفع رقم الإصدار معاً في: `web/index.html`, `web/admin.html`, `web/sw.js`, `web/version.json`, و`AppHosts.buildLabel`.
+بعد البناء شغّل `tool/patch_flutter_bootstrap.ps1` حتى لا يثبّت Flutter Service Worker نسخاً قديمة على الأجهزة.
