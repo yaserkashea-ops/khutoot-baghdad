@@ -42,6 +42,14 @@ class _AdminImportPageState extends State<AdminImportPage> {
 ''';
 
   @override
+  void initState() {
+    super.initState();
+    _raw.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   void dispose() {
     _raw.dispose();
     super.dispose();
@@ -128,29 +136,43 @@ class _AdminImportPageState extends State<AdminImportPage> {
       return;
     }
     setState(() => _publishing = true);
-    final created = await ListingsRepository.shared.insertMany(
-      selected.map((d) => d.listing),
-    );
-    if (!mounted) return;
-    setState(() {
-      _publishing = false;
-      _drafts = [
-        for (final d in _drafts)
-          if (!d.selected) d else d.copyWith(selected: false),
-      ];
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: context.colors.primary,
-        content: Text(
-          'نُشر ${created.length} إعلاناً في الأداة',
-          style: GoogleFonts.ibmPlexSansArabic(
-            color: context.colors.onPrimary,
+    try {
+      final created = await ListingsRepository.shared.insertMany(
+        selected.map((d) => d.listing),
+      );
+      if (!mounted) return;
+      setState(() {
+        _drafts = [
+          for (final d in _drafts)
+            if (!d.selected) d else d.copyWith(selected: false),
+        ];
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: context.colors.primary,
+          content: Text(
+            'نُشر ${created.length} إعلاناً في الأداة',
+            style: GoogleFonts.ibmPlexSansArabic(
+              color: context.colors.onPrimary,
+            ),
           ),
         ),
-      ),
-    );
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'تعذر نشر المسودات. تحقق من الاتصال وحاول مجدداً.',
+            style: GoogleFonts.ibmPlexSansArabic(),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _publishing = false);
+    }
   }
 
   @override
@@ -174,7 +196,7 @@ class _AdminImportPageState extends State<AdminImportPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                'الصق منشورات الكروب أو الرسائل كما هي. افصل كل إعلان بسطر فارغ أو --- ثم راجع قبل النشر.',
+                '1) الصق النص  2) اضغط «تحليل وتحويل»  3) راجع المسودات  4) انشر المحدد',
                 style: GoogleFonts.ibmPlexSansArabic(
                   fontSize: 13,
                   height: 1.45,
@@ -207,21 +229,6 @@ class _AdminImportPageState extends State<AdminImportPage> {
                       style: GoogleFonts.ibmPlexSansArabic(color: c.primary),
                     ),
                   ),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed: _parse,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: c.primary,
-                      foregroundColor: c.onPrimary,
-                      shape: const RoundedRectangleBorder(),
-                    ),
-                    child: Text(
-                      'تحليل',
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(height: 10),
@@ -229,6 +236,12 @@ class _AdminImportPageState extends State<AdminImportPage> {
                 controller: _raw,
                 maxLines: 10,
                 style: GoogleFonts.ibmPlexSansArabic(fontSize: 13, height: 1.45),
+                onChanged: (_) {
+                  // Clear stale drafts when text changes so user re-runs تحليل.
+                  if (_drafts.isNotEmpty) {
+                    setState(() => _drafts = []);
+                  }
+                },
                 decoration: InputDecoration(
                   hintText: 'الصق هنا رسائل الكروب أو SMS…',
                   hintStyle: GoogleFonts.ibmPlexSansArabic(
@@ -244,6 +257,28 @@ class _AdminImportPageState extends State<AdminImportPage> {
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.zero,
                     borderSide: BorderSide(color: c.primary, width: 1.4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton.icon(
+                  onPressed: _raw.text.trim().isEmpty ? null : _parse,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: c.primary,
+                    foregroundColor: c.onPrimary,
+                    disabledBackgroundColor: c.border,
+                    shape: const RoundedRectangleBorder(),
+                  ),
+                  icon: const Icon(Icons.manage_search_outlined, size: 20),
+                  label: Text(
+                    'تحليل وتحويل إلى مسودات',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
                   ),
                 ),
               ),

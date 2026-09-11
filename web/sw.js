@@ -1,7 +1,7 @@
 'use strict';
 
 // Minimal SW for PWA installability only — never force page reloads.
-const CACHE = 'khutoot-baghdad-shell-v26';
+const CACHE = 'khutoot-baghdad-shell-v27';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

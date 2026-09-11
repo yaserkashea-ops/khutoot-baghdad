@@ -10,7 +10,7 @@ abstract final class AppHosts {
   static const adminHost = 'khutoot-baghdad-admin.web.app';
 
   /// يظهر في الواجهة للتأكد أن النسخة وصلت للجهاز.
-  static const buildLabel = '26';
+  static const buildLabel = '27';
 
   /// هل الصفحة الحالية على موقع لوحة التحكم؟
   static bool get isAdminHost {

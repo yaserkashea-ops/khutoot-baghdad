@@ -97,19 +97,25 @@ class AdminRepository {
     String? contactHint,
   }) async {
     if (_client != null) {
-      final row = await _client
-          .from('admin_reports')
-          .insert(
+      // Do not .select() after insert: anon may INSERT but cannot SELECT
+      // admin_reports under RLS, and RETURNING would fail the whole submit.
+      await _client.from('admin_reports').insert(
             AdminReportMapper.toInsert(
               kind: kind,
               message: message,
               listingId: listingId,
               contactHint: contactHint,
             ),
-          )
-          .select()
-          .single();
-      return AdminReportMapper.fromRow(Map<String, dynamic>.from(row));
+          );
+      return AdminReport(
+        id: 'pending',
+        kind: kind,
+        message: message,
+        status: ReportStatus.open,
+        listingId: listingId,
+        contactHint: contactHint,
+        createdAt: DateTime.now(),
+      );
     }
     await Future<void>.delayed(const Duration(milliseconds: 40));
     final report = AdminReport(

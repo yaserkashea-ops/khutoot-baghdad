@@ -118,16 +118,32 @@ class _ContactAdminSheet extends StatelessWidget {
     final detailText = details.text.trim();
     final base = AdminContact.messageFor(kind);
     final message = detailText.isEmpty ? base : '$base\n\n$detailText';
-
-    await AdminRepository.shared.submitReport(
-      kind: kind,
-      message: message,
-      contactHint:
-          contact.text.trim().isEmpty ? null : contact.text.trim(),
-    );
+    final contactHint =
+        contact.text.trim().isEmpty ? null : contact.text.trim();
 
     details.dispose();
     contact.dispose();
+
+    try {
+      await AdminRepository.shared.submitReport(
+        kind: kind,
+        message: message,
+        contactHint: contactHint,
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'تعذر إرسال ${kind.label}. تحقق من الاتصال وحاول مجدداً.',
+            style: GoogleFonts.ibmPlexSansArabic(),
+          ),
+        ),
+      );
+      return;
+    }
+
     if (!context.mounted) return;
 
     await showModalBottomSheet<void>(
