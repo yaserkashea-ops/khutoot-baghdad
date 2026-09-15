@@ -416,6 +416,7 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
   late final PlaceOptionsMenuController _menu;
+  final Object _tapGroup = Object();
   double _fieldWidth = 280;
 
   @override
@@ -448,15 +449,40 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
 
   void _onTextChanged() {
     widget.onChanged(_controller.text);
+    _syncSuggestionsWhileTyping();
+  }
+
+  void _syncSuggestionsWhileTyping() {
+    if (!_focusNode.hasFocus) return;
+    final q = _controller.text.trim();
+    if (q.isEmpty) {
+      if (_menu.isOpen) _closeMenu();
+      return;
+    }
     if (_menu.isOpen) {
       _menu.refilter();
+      return;
     }
+    _menu.open(
+      context: context,
+      width: _fieldWidth,
+      optionsOf: () => widget.options,
+      queryOf: () => _controller.text,
+      leadingOption: _clearOption,
+      onSelected: _onOptionSelected,
+      tapRegionGroupId: _tapGroup,
+      keepFocus: true,
+      showAll: false,
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
   }
 
   void _closeMenu() {
     if (!_menu.isOpen) return;
     _menu.close();
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   void _toggleDropdown() {
@@ -467,6 +493,8 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
       queryOf: () => _controller.text,
       leadingOption: _clearOption,
       onSelected: _onOptionSelected,
+      tapRegionGroupId: _tapGroup,
+      keepFocus: false,
       onChanged: () {
         if (mounted) setState(() {});
       },
@@ -523,80 +551,86 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
         LayoutBuilder(
           builder: (context, constraints) {
             _fieldWidth = constraints.maxWidth;
-            return CompositedTransformTarget(
-              link: _menu.layerLink,
-              child: TextField(
-                controller: _controller,
-                focusNode: _focusNode,
-                style: textStyle,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _commitTyped(),
-                decoration: InputDecoration(
-                  hintText: widget.hint,
-                  hintStyle: GoogleFonts.ibmPlexSansArabic(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 14,
-                    color: c.text.withValues(alpha: 0.38),
-                  ),
-                  isDense: false,
-                  filled: true,
-                  fillColor: c.surface,
-                  prefixIcon: Icon(
-                    Icons.place_outlined,
-                    size: 20,
-                    color: c.text.withValues(alpha: 0.45),
-                  ),
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_controller.text.isNotEmpty)
+            return TapRegion(
+              groupId: _tapGroup,
+              onTapOutside: (_) {
+                if (_menu.isOpen) _closeMenu();
+              },
+              child: CompositedTransformTarget(
+                link: _menu.layerLink,
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  style: textStyle,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _commitTyped(),
+                  decoration: InputDecoration(
+                    hintText: widget.hint,
+                    hintStyle: GoogleFonts.ibmPlexSansArabic(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 14,
+                      color: c.text.withValues(alpha: 0.38),
+                    ),
+                    isDense: false,
+                    filled: true,
+                    fillColor: c.surface,
+                    prefixIcon: Icon(
+                      Icons.place_outlined,
+                      size: 20,
+                      color: c.text.withValues(alpha: 0.45),
+                    ),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_controller.text.isNotEmpty)
+                          IconButton(
+                            tooltip: 'مسح',
+                            style: IconButton.styleFrom(
+                              minimumSize: const Size(44, 44),
+                            ),
+                            icon: Icon(
+                              Icons.close,
+                              size: 18,
+                              color: c.text.withValues(alpha: 0.45),
+                            ),
+                            onPressed: () {
+                              _controller.clear();
+                              widget.onChanged('');
+                              _closeMenu();
+                            },
+                          ),
                         IconButton(
-                          tooltip: 'مسح',
+                          tooltip: menuOpen ? 'إغلاق' : 'القائمة',
                           style: IconButton.styleFrom(
                             minimumSize: const Size(44, 44),
                           ),
                           icon: Icon(
-                            Icons.close,
-                            size: 18,
-                            color: c.text.withValues(alpha: 0.45),
+                            menuOpen
+                                ? Icons.keyboard_arrow_up_rounded
+                                : Icons.keyboard_arrow_down_rounded,
+                            size: 22,
+                            color: c.text.withValues(alpha: 0.5),
                           ),
-                          onPressed: () {
-                            _controller.clear();
-                            widget.onChanged('');
-                            _closeMenu();
-                          },
+                          onPressed: _toggleDropdown,
                         ),
-                      IconButton(
-                        tooltip: menuOpen ? 'إغلاق' : 'القائمة',
-                        style: IconButton.styleFrom(
-                          minimumSize: const Size(44, 44),
-                        ),
-                        icon: Icon(
-                          menuOpen
-                              ? Icons.keyboard_arrow_up_rounded
-                              : Icons.keyboard_arrow_down_rounded,
-                          size: 22,
-                          color: c.text.withValues(alpha: 0.5),
-                        ),
-                        onPressed: _toggleDropdown,
-                      ),
-                    ],
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 14,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: radius,
-                    borderSide: BorderSide(color: c.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: radius,
-                    borderSide: BorderSide(color: c.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: radius,
-                    borderSide: BorderSide(color: c.primary, width: 1.4),
+                      ],
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: radius,
+                      borderSide: BorderSide(color: c.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: radius,
+                      borderSide: BorderSide(color: c.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: radius,
+                      borderSide: BorderSide(color: c.primary, width: 1.4),
+                    ),
                   ),
                 ),
               ),
