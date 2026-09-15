@@ -1,23 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/data/baghdad_places.dart';
 import '../../../core/theme/app_colors.dart';
 
-/// Shared place-options popup via Overlay.
-/// Arrow can open the full list without keyboard; typing can open filtered suggestions
-/// while keeping field focus.
+/// Place-options popup anchored to a field via [targetKey] geometry.
 class PlaceOptionsMenuController {
   PlaceOptionsMenuController();
 
-  final LayerLink layerLink = LayerLink();
+  /// Attach this key to the field widget that the menu should sit under.
+  final GlobalKey targetKey = GlobalKey();
+
   OverlayEntry? _entry;
+  OverlayState? _overlay;
   bool _showAll = true;
+  bool _framePinned = false;
 
   List<String> Function()? _optionsOf;
   String Function()? _queryOf;
   String? _leadingOption;
-  double _width = 280;
   double _maxHeight = 220;
   ValueChanged<String>? _onSelected;
   VoidCallback? _onChanged;
@@ -28,8 +30,10 @@ class PlaceOptionsMenuController {
   void dispose() => close();
 
   void close() {
+    _framePinned = false;
     _entry?.remove();
     _entry = null;
+    _overlay = null;
     _optionsOf = null;
     _queryOf = null;
     _onSelected = null;
@@ -87,7 +91,6 @@ class PlaceOptionsMenuController {
     }
     close();
     _showAll = showAll;
-    _width = width;
     _maxHeight = maxHeight;
     _optionsOf = optionsOf;
     _queryOf = queryOf;
@@ -96,20 +99,53 @@ class PlaceOptionsMenuController {
     _onChanged = onChanged;
     _tapRegionGroupId = tapRegionGroupId;
 
+    _overlay = Overlay.of(context, rootOverlay: true);
     _entry = OverlayEntry(builder: _buildOverlay);
-    Overlay.of(context, rootOverlay: true).insert(_entry!);
+    _overlay!.insert(_entry!);
+    _framePinned = true;
+    _scheduleFramePin();
     onChanged?.call();
   }
 
-  /// Call after typing so an open menu refilters live.
   void refilter() {
     if (!isOpen) return;
     _showAll = false;
     _entry?.markNeedsBuild();
   }
 
+  void _scheduleFramePin() {
+    if (!_framePinned || _entry == null) return;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!_framePinned || _entry == null) return;
+      _entry!.markNeedsBuild();
+      _scheduleFramePin();
+    });
+  }
+
+  Rect? _targetRectInOverlay() {
+    final targetCtx = targetKey.currentContext;
+    final overlay = _overlay;
+    if (targetCtx == null || overlay == null) return null;
+    final targetBox = targetCtx.findRenderObject() as RenderBox?;
+    final overlayBox = overlay.context.findRenderObject() as RenderBox?;
+    if (targetBox == null ||
+        overlayBox == null ||
+        !targetBox.hasSize ||
+        !overlayBox.hasSize) {
+      return null;
+    }
+    final topLeft = targetBox.localToGlobal(
+      Offset.zero,
+      ancestor: overlayBox,
+    );
+    return topLeft & targetBox.size;
+  }
+
   Widget _buildOverlay(BuildContext ctx) {
     final c = ctx.colors;
+    final rect = _targetRectInOverlay();
+    if (rect == null) return const SizedBox.shrink();
+
     final options = _optionsOf?.call() ?? const <String>[];
     final query = _queryOf?.call() ?? '';
     final leading = _leadingOption;
@@ -122,13 +158,23 @@ class PlaceOptionsMenuController {
     final onChanged = _onChanged;
     final groupId = _tapRegionGroupId;
 
+    // Keep menu on-screen vertically when near the bottom.
+    final overlayBox = _overlay!.context.findRenderObject() as RenderBox;
+    final overlayH = overlayBox.size.height;
+    final spaceBelow = overlayH - (rect.bottom + 4);
+    final openUpward = spaceBelow < 120 && rect.top > spaceBelow;
+    final maxH = _maxHeight.clamp(80.0, openUpward ? rect.top - 8 : spaceBelow);
+    final top = openUpward
+        ? (rect.top - maxH - 4).clamp(0.0, overlayH)
+        : rect.bottom + 4;
+
     Widget menu = Material(
       elevation: 4,
       borderRadius: BorderRadius.circular(12),
       color: c.surface,
       clipBehavior: Clip.antiAlias,
       child: SizedBox(
-        width: _width,
+        width: rect.width,
         child: items.isEmpty
             ? Padding(
                 padding: const EdgeInsets.all(14),
@@ -141,7 +187,7 @@ class PlaceOptionsMenuController {
                 ),
               )
             : ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: _maxHeight),
+                constraints: BoxConstraints(maxHeight: maxH),
                 child: ListView.separated(
                   padding: EdgeInsets.zero,
                   shrinkWrap: true,
@@ -187,12 +233,10 @@ class PlaceOptionsMenuController {
       menu = TapRegion(groupId: groupId, child: menu);
     }
 
-    return CompositedTransformFollower(
-      link: layerLink,
-      showWhenUnlinked: false,
-      targetAnchor: Alignment.bottomLeft,
-      followerAnchor: Alignment.topLeft,
-      offset: const Offset(0, 4),
+    return Positioned(
+      left: rect.left,
+      top: top,
+      width: rect.width,
       child: menu,
     );
   }

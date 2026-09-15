@@ -556,8 +556,8 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
               onTapOutside: (_) {
                 if (_menu.isOpen) _closeMenu();
               },
-              child: CompositedTransformTarget(
-                link: _menu.layerLink,
+              child: KeyedSubtree(
+                key: _menu.targetKey,
                 child: TextField(
                   controller: _controller,
                   focusNode: _focusNode,

@@ -46,6 +46,7 @@ class SuggestibleTextField extends StatefulWidget {
 class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
   late final FocusNode _focusNode;
   late final PlaceOptionsMenuController _menu;
+  final Object _tapGroup = Object();
   double _fieldWidth = 280;
 
   @override
@@ -92,6 +93,8 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
       optionsOf: () => widget.options,
       queryOf: () => widget.controller.text,
       maxHeight: widget.subordinate ? 160 : 200,
+      tapRegionGroupId: _tapGroup,
+      keepFocus: false,
       onSelected: (value) {
         widget.controller.text = value;
         widget.controller.selection =
@@ -159,79 +162,88 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
         LayoutBuilder(
           builder: (context, constraints) {
             _fieldWidth = constraints.maxWidth;
-            return CompositedTransformTarget(
-              link: _menu.layerLink,
-              child: TextFormField(
-                key: widget.fieldKey,
-                controller: widget.controller,
-                focusNode: _focusNode,
-                validator: widget.validator,
-                style: textStyle,
-                maxLength: widget.maxLength,
-                inputFormatters: widget.inputFormatters,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) {
+            return TapRegion(
+              groupId: _tapGroup,
+              onTapOutside: (_) {
+                if (_menu.isOpen) {
                   _menu.close();
-                  _emitCommitted(unfocus: true);
-                  if (mounted) setState(() {});
-                },
-                decoration: InputDecoration(
-                  hintText: widget.hint ?? 'اكتب يدوياً أو اختر',
-                  counterText: '',
-                  hintStyle: GoogleFonts.ibmPlexSansArabic(
-                    fontWeight: FontWeight.w400,
-                    fontSize: sub ? 10 : 11,
-                    color: c.text.withValues(alpha: 0.35),
-                  ),
-                  isDense: true,
-                  suffixIcon: IconButton(
-                    tooltip: menuOpen ? 'إغلاق' : 'القائمة',
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                    constraints: BoxConstraints(
-                      minWidth: sub ? 28 : 32,
-                      minHeight: sub ? 28 : 32,
+                  setState(() {});
+                }
+              },
+              child: KeyedSubtree(
+                key: _menu.targetKey,
+                child: TextFormField(
+                  key: widget.fieldKey,
+                  controller: widget.controller,
+                  focusNode: _focusNode,
+                  validator: widget.validator,
+                  style: textStyle,
+                  maxLength: widget.maxLength,
+                  inputFormatters: widget.inputFormatters,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) {
+                    _menu.close();
+                    _emitCommitted(unfocus: true);
+                    if (mounted) setState(() {});
+                  },
+                  decoration: InputDecoration(
+                    hintText: widget.hint ?? 'اكتب يدوياً أو اختر',
+                    counterText: '',
+                    hintStyle: GoogleFonts.ibmPlexSansArabic(
+                      fontWeight: FontWeight.w400,
+                      fontSize: sub ? 10 : 11,
+                      color: c.text.withValues(alpha: 0.35),
                     ),
-                    icon: Icon(
-                      menuOpen
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
-                      size: sub ? 16 : 18,
-                      color: c.text.withValues(alpha: sub ? 0.28 : 0.38),
+                    isDense: true,
+                    suffixIcon: IconButton(
+                      tooltip: menuOpen ? 'إغلاق' : 'القائمة',
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      constraints: BoxConstraints(
+                        minWidth: sub ? 28 : 32,
+                        minHeight: sub ? 28 : 32,
+                      ),
+                      icon: Icon(
+                        menuOpen
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: sub ? 16 : 18,
+                        color: c.text.withValues(alpha: sub ? 0.28 : 0.38),
+                      ),
+                      onPressed: _toggleDropdown,
                     ),
-                    onPressed: _toggleDropdown,
-                  ),
-                  filled: true,
-                  fillColor: sub
-                      ? c.surface.withValues(alpha: 0.55)
-                      : c.surface.withValues(alpha: 0.92),
-                  contentPadding: EdgeInsetsDirectional.fromSTEB(
-                    sub ? 7 : 8,
-                    sub ? 5 : 6,
-                    4,
-                    sub ? 5 : 6,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: radius,
-                    borderSide: BorderSide(
-                      color: c.border.withValues(alpha: sub ? 0.45 : 0.8),
+                    filled: true,
+                    fillColor: sub
+                        ? c.surface.withValues(alpha: 0.55)
+                        : c.surface.withValues(alpha: 0.92),
+                    contentPadding: EdgeInsetsDirectional.fromSTEB(
+                      sub ? 7 : 8,
+                      sub ? 5 : 6,
+                      4,
+                      sub ? 5 : 6,
                     ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: radius,
-                    borderSide: BorderSide(
-                      color: c.border.withValues(alpha: sub ? 0.45 : 0.8),
+                    border: OutlineInputBorder(
+                      borderRadius: radius,
+                      borderSide: BorderSide(
+                        color: c.border.withValues(alpha: sub ? 0.45 : 0.8),
+                      ),
                     ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: radius,
-                    borderSide: BorderSide(
-                      color: c.primary.withValues(alpha: sub ? 0.55 : 0.8),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: radius,
+                      borderSide: BorderSide(
+                        color: c.border.withValues(alpha: sub ? 0.45 : 0.8),
+                      ),
                     ),
-                  ),
-                  errorBorder: OutlineInputBorder(
-                    borderRadius: radius,
-                    borderSide: BorderSide(color: c.riderAccent),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: radius,
+                      borderSide: BorderSide(
+                        color: c.primary.withValues(alpha: sub ? 0.55 : 0.8),
+                      ),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: radius,
+                      borderSide: BorderSide(color: c.riderAccent),
+                    ),
                   ),
                 ),
               ),
