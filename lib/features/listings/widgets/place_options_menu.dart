@@ -134,10 +134,10 @@ class PlaceOptionsMenuController {
         !overlayBox.hasSize) {
       return null;
     }
-    final topLeft = targetBox.localToGlobal(
-      Offset.zero,
-      ancestor: overlayBox,
-    );
+    // Prefer global deltas — more reliable on mobile web than ancestor:.
+    final targetGlobal = targetBox.localToGlobal(Offset.zero);
+    final overlayGlobal = overlayBox.localToGlobal(Offset.zero);
+    final topLeft = targetGlobal - overlayGlobal;
     return topLeft & targetBox.size;
   }
 
@@ -158,15 +158,24 @@ class PlaceOptionsMenuController {
     final onChanged = _onChanged;
     final groupId = _tapRegionGroupId;
 
-    // Keep menu on-screen vertically when near the bottom.
     final overlayBox = _overlay!.context.findRenderObject() as RenderBox;
+    final keyboard = MediaQuery.viewInsetsOf(ctx).bottom;
     final overlayH = overlayBox.size.height;
-    final spaceBelow = overlayH - (rect.bottom + 4);
-    final openUpward = spaceBelow < 120 && rect.top > spaceBelow;
-    final maxH = _maxHeight.clamp(80.0, openUpward ? rect.top - 8 : spaceBelow);
+    final usableBottom = overlayH - keyboard;
+    final spaceBelow = (usableBottom - rect.bottom - 4).clamp(0.0, overlayH);
+    final spaceAbove = (rect.top - 4).clamp(0.0, overlayH);
+    final openUpward = spaceBelow < 140 && spaceAbove > spaceBelow;
+    final available = openUpward ? spaceAbove : spaceBelow;
+    // Never call clamp(lower, upper) with lower > upper — that threw and hid the menu
+    // when the keyboard left little space under the field.
+    final maxH = available <= 0
+        ? _maxHeight
+        : (available < 48 ? available : available.clamp(48.0, _maxHeight));
+    if (maxH < 40) return const SizedBox.shrink();
+
     final top = openUpward
-        ? (rect.top - maxH - 4).clamp(0.0, overlayH)
-        : rect.bottom + 4;
+        ? (rect.top - maxH - 4).clamp(0.0, usableBottom)
+        : (rect.bottom + 4).clamp(0.0, usableBottom);
 
     Widget menu = Material(
       elevation: 4,
