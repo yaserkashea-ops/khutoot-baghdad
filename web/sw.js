@@ -1,7 +1,7 @@
 'use strict';
 
 // Installability-only SW. Does not cache app JS/HTML so stable URLs get updates.
-const CACHE = 'khutoot-baghdad-shell-v77';
+const CACHE = 'khutoot-baghdad-shell-v78';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

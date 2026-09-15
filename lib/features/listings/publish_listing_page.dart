@@ -300,21 +300,29 @@ class _PublishListingPageState extends State<PublishListingPage> {
       }
 
       if (_isEditing) {
-        await widget.repository.update(draft);
+        final updated = await widget.repository.update(draft);
+        await LearnedPlacesStore.rememberFromListing(
+          area: updated.area,
+          destination: updated.destination,
+          originSubs: updated.originSubs,
+          destinationSubs: updated.destinationSubs,
+        );
+        if (!mounted) return;
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(updated);
+        }
       } else {
-        await widget.repository.insert(draft);
-      }
-
-      await LearnedPlacesStore.rememberFromListing(
-        area: draft.area,
-        destination: draft.destination,
-        originSubs: draft.originSubs,
-        destinationSubs: draft.destinationSubs,
-      );
-
-      if (!mounted) return;
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop(true);
+        final created = await widget.repository.insert(draft);
+        await LearnedPlacesStore.rememberFromListing(
+          area: created.area,
+          destination: created.destination,
+          originSubs: created.originSubs,
+          destinationSubs: created.destinationSubs,
+        );
+        if (!mounted) return;
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(created);
+        }
       }
     } finally {
       if (mounted) setState(() => _saving = false);

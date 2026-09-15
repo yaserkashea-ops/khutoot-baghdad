@@ -156,7 +156,7 @@ class _AdminDuplicatesPageState extends State<AdminDuplicatesPage> {
   }
 
   Future<void> _edit(Listing listing) async {
-    final saved = await Navigator.of(context).push<bool>(
+    final saved = await Navigator.of(context).push<Listing>(
       MaterialPageRoute(
         builder: (_) => PublishListingPage(
           repository: ListingsRepository.shared,
@@ -164,7 +164,7 @@ class _AdminDuplicatesPageState extends State<AdminDuplicatesPage> {
         ),
       ),
     );
-    if (saved == true) await _load();
+    if (saved != null) await _load();
   }
 
   Future<void> _deleteSelected() async {

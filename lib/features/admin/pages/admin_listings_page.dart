@@ -98,7 +98,7 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
   }
 
   Future<void> _edit(Listing listing) async {
-    final saved = await Navigator.of(context).push<bool>(
+    final saved = await Navigator.of(context).push<Listing>(
       MaterialPageRoute(
         builder: (_) => PublishListingPage(
           repository: ListingsRepository.shared,
@@ -106,7 +106,7 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
         ),
       ),
     );
-    if (saved == true) await _load();
+    if (saved != null) await _load();
   }
 
   @override

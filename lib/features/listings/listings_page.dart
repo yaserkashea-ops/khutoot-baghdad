@@ -45,12 +45,20 @@ class _ListingsPageState extends State<ListingsPage> {
   String _departureQuery = '';
   String _returnQuery = '';
   ListingType? _listingType; // null = الكل
+  String? _highlightedListingId;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     PwaInstall.setMode('app');
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -106,7 +114,7 @@ class _ListingsPageState extends State<ListingsPage> {
     final destQ = _destinationQuery.trim();
     final depQ = _departureQuery.trim();
     final retQ = _returnQuery.trim();
-    return _all.where((l) {
+    final list = _all.where((l) {
       if (areaQ.isNotEmpty && !_matchesPlace(l, areaQ, preferArea: true)) {
         return false;
       }
@@ -130,6 +138,16 @@ class _ListingsPageState extends State<ListingsPage> {
       }
       return true;
     }).toList();
+
+    final hi = _highlightedListingId;
+    if (hi != null) {
+      final i = list.indexWhere((l) => l.id == hi);
+      if (i > 0) {
+        final item = list.removeAt(i);
+        list.insert(0, item);
+      }
+    }
+    return list;
   }
 
   bool get _hasPlaceSearch =>
@@ -239,7 +257,7 @@ class _ListingsPageState extends State<ListingsPage> {
   }
 
   Future<void> _onPublish({ListingType? initialType}) async {
-    final saved = await Navigator.of(context).push<bool>(
+    final saved = await Navigator.of(context).push<Listing>(
       MaterialPageRoute(
         builder: (_) => PublishListingPage(
           repository: _repository,
@@ -247,23 +265,51 @@ class _ListingsPageState extends State<ListingsPage> {
         ),
       ),
     );
+    if (!mounted || saved == null) return;
+
+    setState(() {
+      _areaQuery = saved.area;
+      _destinationQuery = saved.destination;
+      _timeSlot = null;
+      _gender = null;
+      _departureQuery = '';
+      _returnQuery = '';
+      _listingType = null;
+      _highlightedListingId = saved.id;
+    });
+
+    await _load();
     if (!mounted) return;
-    if (saved == true) {
-      await _load();
-      if (!mounted) return;
-      final c = context.colors;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: c.primary,
-          duration: const Duration(seconds: 2),
-          content: Text(
-            'تم نشر الإعلان بنجاح',
-            style: TextStyle(color: c.onPrimary),
-          ),
-        ),
+
+    if (_scrollController.hasClients) {
+      await _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOut,
       );
     }
+    if (!mounted) return;
+
+    final c = context.colors;
+    final kind = saved.isDriver ? 'إعلان سائق' : 'إعلان بحث عن خط';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: c.primary,
+        duration: const Duration(seconds: 3),
+        content: Text(
+          'تم النشر — هذا $kind يظهر الآن في النتائج',
+          style: TextStyle(color: c.onPrimary),
+        ),
+      ),
+    );
+
+    Future<void>.delayed(const Duration(seconds: 8), () {
+      if (!mounted) return;
+      if (_highlightedListingId == saved.id) {
+        setState(() => _highlightedListingId = null);
+      }
+    });
   }
 
   Future<void> _onContact(Listing listing) async {
@@ -410,6 +456,7 @@ class _ListingsPageState extends State<ListingsPage> {
                     color: c.primary,
                     onRefresh: _load,
                     child: CustomScrollView(
+                      controller: _scrollController,
                       physics: const AlwaysScrollableScrollPhysics(),
                       slivers: [
                         SliverPadding(
@@ -540,6 +587,8 @@ class _ListingsPageState extends State<ListingsPage> {
                                 final listing = filtered[index];
                                 return ListingCard(
                                   listing: listing,
+                                  highlighted:
+                                      listing.id == _highlightedListingId,
                                   onContact: () => _onContact(listing),
                                 );
                               },

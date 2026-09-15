@@ -10,10 +10,12 @@ class ListingCard extends StatelessWidget {
     super.key,
     required this.listing,
     this.onContact,
+    this.highlighted = false,
   });
 
   final Listing listing;
   final VoidCallback? onContact;
+  final bool highlighted;
 
   String get _typeTitle => listing.isDriver
       ? 'سائق لديه خط'
@@ -87,18 +89,36 @@ class ListingCard extends StatelessWidget {
     final badgeColor = listing.isDriver ? c.accent : c.riderAccent;
 
     return Material(
-      color: c.surface,
+      color: highlighted
+          ? badgeColor.withValues(alpha: 0.06)
+          : c.surface,
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: c.border),
+          border: Border.all(
+            color: highlighted
+                ? badgeColor.withValues(alpha: 0.85)
+                : c.border,
+            width: highlighted ? 1.6 : 1,
+          ),
         ),
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (highlighted) ...[
+              Text(
+                'منشورك — يظهر الآن للآخرين',
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: badgeColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: Container(
