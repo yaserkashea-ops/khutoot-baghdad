@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/data/baghdad_places.dart';
 import '../../../core/theme/app_colors.dart';
+import 'place_options_menu.dart';
 
 /// Text field with suggestion list. Free typing is always allowed.
-/// The options menu opens/closes only via the arrow — never on tap/type alone.
+/// The options menu opens/closes only via the arrow — without opening the keyboard.
 class SuggestibleTextField extends StatefulWidget {
   const SuggestibleTextField({
     super.key,
@@ -45,66 +45,64 @@ class SuggestibleTextField extends StatefulWidget {
 
 class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
   late final FocusNode _focusNode;
-  bool _menuOpen = false;
-  bool _showAll = false;
+  late final PlaceOptionsMenuController _menu;
+  double _fieldWidth = 280;
 
   @override
   void initState() {
     super.initState();
     _focusNode = FocusNode();
+    _menu = PlaceOptionsMenuController();
     _focusNode.addListener(_onFocusChange);
+    widget.controller.addListener(_onTextChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant SuggestibleTextField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onTextChanged);
+      widget.controller.addListener(_onTextChanged);
+    }
   }
 
   @override
   void dispose() {
+    widget.controller.removeListener(_onTextChanged);
     _focusNode.removeListener(_onFocusChange);
+    _menu.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
+  void _onTextChanged() {
+    if (_menu.isOpen) _menu.refilter();
+  }
+
   void _onFocusChange() {
     if (!_focusNode.hasFocus) {
-      if (_menuOpen) {
-        setState(() {
-          _menuOpen = false;
-          _showAll = false;
-        });
-      }
       _emitCommitted(unfocus: false);
     }
   }
 
-  void _closeMenu({bool unfocus = true}) {
-    setState(() {
-      _menuOpen = false;
-      _showAll = false;
-    });
-    if (unfocus) _focusNode.unfocus();
-  }
-
   void _toggleDropdown() {
-    if (_menuOpen) {
-      _closeMenu();
-      return;
-    }
-    setState(() {
-      _menuOpen = true;
-      _showAll = true;
-    });
-    _focusNode.requestFocus();
-  }
-
-  Iterable<String> _optionsFor(TextEditingValue value) {
-    if (!_menuOpen) return const Iterable<String>.empty();
-
-    final q = value.text.trim();
-    final seen = <String>{};
-    final pool = <String>[];
-    for (final o in widget.options) {
-      if (seen.add(o)) pool.add(o);
-    }
-    if (_showAll || q.isEmpty) return pool;
-    return pool.where((o) => BaghdadPlaces.matchesQuery(o, q));
+    _menu.toggle(
+      context: context,
+      width: _fieldWidth,
+      optionsOf: () => widget.options,
+      queryOf: () => widget.controller.text,
+      maxHeight: widget.subordinate ? 160 : 200,
+      onSelected: (value) {
+        widget.controller.text = value;
+        widget.controller.selection =
+            TextSelection.collapsed(offset: value.length);
+        _emitCommitted(unfocus: true);
+        if (mounted) setState(() {});
+      },
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
   }
 
   void _emitCommitted({required bool unfocus}) {
@@ -130,6 +128,7 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
       fontSize: sub ? 11 : 12,
       color: c.text.withValues(alpha: sub ? 0.88 : 1),
     );
+    final menuOpen = _menu.isOpen;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -159,157 +158,83 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
           const SizedBox(height: 3),
         LayoutBuilder(
           builder: (context, constraints) {
-            final fieldWidth = constraints.maxWidth;
-            return RawAutocomplete<String>(
-              textEditingController: widget.controller,
-              focusNode: _focusNode,
-              optionsBuilder: _optionsFor,
-              onSelected: (value) {
-                setState(() {
-                  _menuOpen = false;
-                  _showAll = false;
-                });
-                widget.controller.text = value;
-                widget.controller.selection =
-                    TextSelection.collapsed(offset: value.length);
-                _emitCommitted(unfocus: true);
-              },
-              fieldViewBuilder:
-                  (context, textController, focusNode, onFieldSubmitted) {
-                return TextFormField(
-                  key: widget.fieldKey,
-                  controller: textController,
-                  focusNode: focusNode,
-                  validator: widget.validator,
-                  style: textStyle,
-                  maxLength: widget.maxLength,
-                  inputFormatters: widget.inputFormatters,
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) {
-                    setState(() {
-                      _menuOpen = false;
-                      _showAll = false;
-                    });
-                    _emitCommitted(unfocus: true);
-                    onFieldSubmitted();
-                  },
-                  onChanged: (_) {
-                    if (_menuOpen) {
-                      setState(() => _showAll = false);
-                    }
-                  },
-                  decoration: InputDecoration(
-                    hintText: widget.hint ?? 'اكتب يدوياً أو اختر',
-                    counterText: '',
-                    hintStyle: GoogleFonts.ibmPlexSansArabic(
-                      fontWeight: FontWeight.w400,
-                      fontSize: sub ? 10 : 11,
-                      color: c.text.withValues(alpha: 0.35),
+            _fieldWidth = constraints.maxWidth;
+            return CompositedTransformTarget(
+              link: _menu.layerLink,
+              child: TextFormField(
+                key: widget.fieldKey,
+                controller: widget.controller,
+                focusNode: _focusNode,
+                validator: widget.validator,
+                style: textStyle,
+                maxLength: widget.maxLength,
+                inputFormatters: widget.inputFormatters,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) {
+                  _menu.close();
+                  _emitCommitted(unfocus: true);
+                  if (mounted) setState(() {});
+                },
+                decoration: InputDecoration(
+                  hintText: widget.hint ?? 'اكتب يدوياً أو اختر',
+                  counterText: '',
+                  hintStyle: GoogleFonts.ibmPlexSansArabic(
+                    fontWeight: FontWeight.w400,
+                    fontSize: sub ? 10 : 11,
+                    color: c.text.withValues(alpha: 0.35),
+                  ),
+                  isDense: true,
+                  suffixIcon: IconButton(
+                    tooltip: menuOpen ? 'إغلاق' : 'القائمة',
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    constraints: BoxConstraints(
+                      minWidth: sub ? 28 : 32,
+                      minHeight: sub ? 28 : 32,
                     ),
-                    isDense: true,
-                    suffixIcon: IconButton(
-                      tooltip: _menuOpen ? 'إغلاق' : 'القائمة',
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                      constraints: BoxConstraints(
-                        minWidth: sub ? 28 : 32,
-                        minHeight: sub ? 28 : 32,
-                      ),
-                      icon: Icon(
-                        _menuOpen
-                            ? Icons.keyboard_arrow_up_rounded
-                            : Icons.keyboard_arrow_down_rounded,
-                        size: sub ? 16 : 18,
-                        color: c.text.withValues(alpha: sub ? 0.28 : 0.38),
-                      ),
-                      onPressed: _toggleDropdown,
+                    icon: Icon(
+                      menuOpen
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: sub ? 16 : 18,
+                      color: c.text.withValues(alpha: sub ? 0.28 : 0.38),
                     ),
-                    filled: true,
-                    fillColor: sub
-                        ? c.surface.withValues(alpha: 0.55)
-                        : c.surface.withValues(alpha: 0.92),
-                    contentPadding: EdgeInsetsDirectional.fromSTEB(
-                      sub ? 7 : 8,
-                      sub ? 5 : 6,
-                      4,
-                      sub ? 5 : 6,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: radius,
-                      borderSide: BorderSide(
-                        color: c.border.withValues(alpha: sub ? 0.45 : 0.8),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: radius,
-                      borderSide: BorderSide(
-                        color: c.border.withValues(alpha: sub ? 0.45 : 0.8),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: radius,
-                      borderSide: BorderSide(
-                        color: c.primary.withValues(alpha: sub ? 0.55 : 0.8),
-                      ),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: radius,
-                      borderSide: BorderSide(color: c.riderAccent),
+                    onPressed: _toggleDropdown,
+                  ),
+                  filled: true,
+                  fillColor: sub
+                      ? c.surface.withValues(alpha: 0.55)
+                      : c.surface.withValues(alpha: 0.92),
+                  contentPadding: EdgeInsetsDirectional.fromSTEB(
+                    sub ? 7 : 8,
+                    sub ? 5 : 6,
+                    4,
+                    sub ? 5 : 6,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: radius,
+                    borderSide: BorderSide(
+                      color: c.border.withValues(alpha: sub ? 0.45 : 0.8),
                     ),
                   ),
-                );
-              },
-              optionsViewBuilder: (context, onSelected, optionsIterable) {
-                if (!_menuOpen) return const SizedBox.shrink();
-                final opts = optionsIterable.toList();
-                if (opts.isEmpty) return const SizedBox.shrink();
-                return Align(
-                  alignment: AlignmentDirectional.topStart,
-                  child: SizedBox(
-                    width: fieldWidth,
-                    child: Material(
-                      elevation: 2,
-                      borderRadius: BorderRadius.circular(8),
-                      color: c.surface,
-                      clipBehavior: Clip.antiAlias,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 180),
-                        child: ListView.separated(
-                          padding: EdgeInsets.zero,
-                          shrinkWrap: true,
-                          itemCount: opts.length,
-                          separatorBuilder: (_, _) => Divider(
-                            height: 1,
-                            color: c.border.withValues(alpha: 0.65),
-                          ),
-                          itemBuilder: (context, index) {
-                            final option = opts[index];
-                            return InkWell(
-                              onTap: () => onSelected(option),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 8,
-                                ),
-                                child: Text(
-                                  option,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.ibmPlexSansArabic(
-                                    fontWeight: FontWeight.w400,
-                                    fontSize: 12,
-                                    color: c.text,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: radius,
+                    borderSide: BorderSide(
+                      color: c.border.withValues(alpha: sub ? 0.45 : 0.8),
                     ),
                   ),
-                );
-              },
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: radius,
+                    borderSide: BorderSide(
+                      color: c.primary.withValues(alpha: sub ? 0.55 : 0.8),
+                    ),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: radius,
+                    borderSide: BorderSide(color: c.riderAccent),
+                  ),
+                ),
+              ),
             );
           },
         ),

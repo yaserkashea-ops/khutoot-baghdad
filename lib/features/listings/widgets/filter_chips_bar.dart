@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/data/baghdad_places.dart';
 import '../../../core/theme/app_colors.dart';
+import 'place_options_menu.dart';
 
 /// Mobile-first search panel for transit listings.
 class FilterChipsBar extends StatelessWidget {
@@ -414,16 +415,16 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
 
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
-  bool _showAll = false;
-  bool _menuOpen = false;
+  late final PlaceOptionsMenuController _menu;
+  double _fieldWidth = 280;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.value);
     _focusNode = FocusNode();
+    _menu = PlaceOptionsMenuController();
     _controller.addListener(_onTextChanged);
-    _focusNode.addListener(_onFocusChanged);
   }
 
   @override
@@ -439,68 +440,52 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
   @override
   void dispose() {
     _controller.removeListener(_onTextChanged);
-    _focusNode.removeListener(_onFocusChanged);
+    _menu.dispose();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
-  void _onTextChanged() => widget.onChanged(_controller.text);
-
-  void _onFocusChanged() {
-    if (!_focusNode.hasFocus && _menuOpen) {
-      setState(() {
-        _menuOpen = false;
-        _showAll = false;
-      });
+  void _onTextChanged() {
+    widget.onChanged(_controller.text);
+    if (_menu.isOpen) {
+      _menu.refilter();
     }
   }
 
   void _closeMenu() {
-    setState(() {
-      _menuOpen = false;
-      _showAll = false;
-    });
-    _focusNode.unfocus();
+    if (!_menu.isOpen) return;
+    _menu.close();
+    setState(() {});
   }
 
   void _toggleDropdown() {
-    if (_menuOpen) {
-      _closeMenu();
-      return;
-    }
-    setState(() {
-      _menuOpen = true;
-      _showAll = true;
-    });
-    _focusNode.requestFocus();
+    _menu.toggle(
+      context: context,
+      width: _fieldWidth,
+      optionsOf: () => widget.options,
+      queryOf: () => _controller.text,
+      leadingOption: _clearOption,
+      onSelected: _onOptionSelected,
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
   }
 
-  Iterable<String> _buildOptions(TextEditingValue value) {
-    if (!_menuOpen) return const Iterable<String>.empty();
-
-    final seen = <String>{};
-    final pool = <String>[];
-    for (final o in widget.options) {
-      if (seen.add(o)) pool.add(o);
+  void _onOptionSelected(String selection) {
+    if (selection == _clearOption) {
+      _controller.clear();
+      widget.onChanged('');
+      setState(() {});
+      return;
     }
-    final q = value.text.trim();
-    final matched = (_showAll || q.isEmpty)
-        ? pool
-        : pool.where((o) => BaghdadPlaces.matchesQuery(o, q)).toList();
-
-    return [
-      _clearOption,
-      ...matched.where((o) => o != _clearOption),
-    ];
+    _commitTyped(selection);
   }
 
   void _commitTyped([String? raw]) {
     final text = (raw ?? _controller.text).trim();
-    setState(() {
-      _menuOpen = false;
-      _showAll = false;
-    });
+    _closeMenu();
     if (_controller.text != text) {
       _controller.text = text;
       _controller.selection = TextSelection.collapsed(offset: text.length);
@@ -521,6 +506,7 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
       fontSize: 15,
       color: c.text,
     );
+    final menuOpen = _menu.isOpen;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -536,162 +522,84 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
         const SizedBox(height: 6),
         LayoutBuilder(
           builder: (context, constraints) {
-            final fieldWidth = constraints.maxWidth;
-            return RawAutocomplete<String>(
-              textEditingController: _controller,
-              focusNode: _focusNode,
-              optionsBuilder: _buildOptions,
-              onSelected: (selection) {
-                if (selection == _clearOption) {
-                  setState(() {
-                    _menuOpen = false;
-                    _showAll = false;
-                  });
-                  _controller.clear();
-                  widget.onChanged('');
-                  _focusNode.unfocus();
-                  return;
-                }
-                _commitTyped(selection);
-              },
-              fieldViewBuilder:
-                  (context, textController, focusNode, onFieldSubmitted) {
-                return TextField(
-                  controller: textController,
-                  focusNode: focusNode,
-                  style: textStyle,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _commitTyped(),
-                  onChanged: (_) {
-                    // Filter open list while typing — never auto-open on type.
-                    if (_menuOpen) {
-                      setState(() => _showAll = false);
-                    }
-                  },
-                  decoration: InputDecoration(
-                    hintText: widget.hint,
-                    hintStyle: GoogleFonts.ibmPlexSansArabic(
-                      fontWeight: FontWeight.w400,
-                      fontSize: 14,
-                      color: c.text.withValues(alpha: 0.38),
-                    ),
-                    isDense: false,
-                    filled: true,
-                    fillColor: c.surface,
-                    prefixIcon: Icon(
-                      Icons.place_outlined,
-                      size: 20,
-                      color: c.text.withValues(alpha: 0.45),
-                    ),
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (textController.text.isNotEmpty)
-                          IconButton(
-                            tooltip: 'مسح',
-                            style: IconButton.styleFrom(
-                              minimumSize: const Size(44, 44),
-                            ),
-                            icon: Icon(
-                              Icons.close,
-                              size: 18,
-                              color: c.text.withValues(alpha: 0.45),
-                            ),
-                            onPressed: () {
-                              textController.clear();
-                              widget.onChanged('');
-                              _closeMenu();
-                            },
-                          ),
+            _fieldWidth = constraints.maxWidth;
+            return CompositedTransformTarget(
+              link: _menu.layerLink,
+              child: TextField(
+                controller: _controller,
+                focusNode: _focusNode,
+                style: textStyle,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _commitTyped(),
+                decoration: InputDecoration(
+                  hintText: widget.hint,
+                  hintStyle: GoogleFonts.ibmPlexSansArabic(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14,
+                    color: c.text.withValues(alpha: 0.38),
+                  ),
+                  isDense: false,
+                  filled: true,
+                  fillColor: c.surface,
+                  prefixIcon: Icon(
+                    Icons.place_outlined,
+                    size: 20,
+                    color: c.text.withValues(alpha: 0.45),
+                  ),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_controller.text.isNotEmpty)
                         IconButton(
-                          tooltip: _menuOpen ? 'إغلاق' : 'القائمة',
+                          tooltip: 'مسح',
                           style: IconButton.styleFrom(
                             minimumSize: const Size(44, 44),
                           ),
                           icon: Icon(
-                            _menuOpen
-                                ? Icons.keyboard_arrow_up_rounded
-                                : Icons.keyboard_arrow_down_rounded,
-                            size: 22,
-                            color: c.text.withValues(alpha: 0.5),
+                            Icons.close,
+                            size: 18,
+                            color: c.text.withValues(alpha: 0.45),
                           ),
-                          onPressed: _toggleDropdown,
-                        ),
-                      ],
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 14,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: radius,
-                      borderSide: BorderSide(color: c.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: radius,
-                      borderSide: BorderSide(color: c.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: radius,
-                      borderSide: BorderSide(color: c.primary, width: 1.4),
-                    ),
-                  ),
-                );
-              },
-              optionsViewBuilder: (context, onSelected, optionsIterable) {
-                if (!_menuOpen) return const SizedBox.shrink();
-                final opts = optionsIterable.toList();
-                if (opts.isEmpty) return const SizedBox.shrink();
-                return Align(
-                  alignment: AlignmentDirectional.topStart,
-                  child: SizedBox(
-                    width: fieldWidth,
-                    child: Material(
-                      elevation: 3,
-                      borderRadius: BorderRadius.circular(12),
-                      color: c.surface,
-                      clipBehavior: Clip.antiAlias,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 220),
-                        child: ListView.separated(
-                          padding: EdgeInsets.zero,
-                          shrinkWrap: true,
-                          itemCount: opts.length,
-                          separatorBuilder: (_, _) => Divider(
-                            height: 1,
-                            color: c.border.withValues(alpha: 0.8),
-                          ),
-                          itemBuilder: (context, index) {
-                            final option = opts[index];
-                            final isClear = option == _clearOption;
-                            return InkWell(
-                              onTap: () => onSelected(option),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 12,
-                                ),
-                                child: Text(
-                                  option,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.ibmPlexSansArabic(
-                                    fontWeight: isClear
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                    fontSize: 14,
-                                    color: isClear ? c.primary : c.text,
-                                  ),
-                                ),
-                              ),
-                            );
+                          onPressed: () {
+                            _controller.clear();
+                            widget.onChanged('');
+                            _closeMenu();
                           },
                         ),
+                      IconButton(
+                        tooltip: menuOpen ? 'إغلاق' : 'القائمة',
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                        ),
+                        icon: Icon(
+                          menuOpen
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                          size: 22,
+                          color: c.text.withValues(alpha: 0.5),
+                        ),
+                        onPressed: _toggleDropdown,
                       ),
-                    ),
+                    ],
                   ),
-                );
-              },
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 14,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: radius,
+                    borderSide: BorderSide(color: c.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: radius,
+                    borderSide: BorderSide(color: c.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: radius,
+                    borderSide: BorderSide(color: c.primary, width: 1.4),
+                  ),
+                ),
+              ),
             );
           },
         ),
