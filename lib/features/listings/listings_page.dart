@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../core/bootstrap/app_bootstrap.dart';
 import '../../core/data/baghdad_places.dart';
+import '../../core/data/learned_places_store.dart';
 import '../../core/models/listing.dart';
 import '../../core/pwa/install_app_button.dart';
 import '../../core/pwa/pwa_install.dart';
@@ -25,10 +29,12 @@ class ListingsPage extends StatefulWidget {
 }
 
 class _ListingsPageState extends State<ListingsPage> {
-  late final ListingsRepository _repository =
+  ListingsRepository get _repository =>
       widget.repository ?? ListingsRepository.shared;
 
   List<Listing> _all = [];
+  List<String> _learnedAreas = [];
+  List<String> _learnedDestinations = [];
   bool _loading = true;
   String? _loadError;
 
@@ -53,10 +59,21 @@ class _ListingsPageState extends State<ListingsPage> {
       _loadError = null;
     });
     try {
-      final items = await _repository.fetchAll();
+      try {
+        await AppBootstrap.ready.timeout(const Duration(seconds: 8));
+      } on TimeoutException {
+        // Continue with whatever repository is ready.
+      }
+      final results = await Future.wait([
+        _repository.fetchAll(),
+        LearnedPlacesStore.areas(),
+        LearnedPlacesStore.destinations(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _all = items;
+        _all = results[0] as List<Listing>;
+        _learnedAreas = results[1] as List<String>;
+        _learnedDestinations = results[2] as List<String>;
         _loading = false;
       });
     } catch (_) {
@@ -66,6 +83,22 @@ class _ListingsPageState extends State<ListingsPage> {
         _loadError = 'تعذر تحميل الخطوط. تحقق من الاتصال وحاول مجدداً.';
       });
     }
+  }
+
+  Future<void> _rememberArea(String value) async {
+    await LearnedPlacesStore.rememberArea(value);
+    if (!mounted) return;
+    final learned = await LearnedPlacesStore.areas();
+    if (!mounted) return;
+    setState(() => _learnedAreas = learned);
+  }
+
+  Future<void> _rememberDestination(String value) async {
+    await LearnedPlacesStore.rememberDestination(value);
+    if (!mounted) return;
+    final learned = await LearnedPlacesStore.destinations();
+    if (!mounted) return;
+    setState(() => _learnedDestinations = learned);
   }
 
   List<Listing> get _filtered {
@@ -127,12 +160,14 @@ class _ListingsPageState extends State<ListingsPage> {
       };
 
   List<String> get _areas => {
+        ..._learnedAreas,
         ..._all.map((e) => e.area),
         ..._all.expand((e) => e.originSubs),
       }.toList()
         ..sort();
 
   List<String> get _destinations => {
+        ..._learnedDestinations,
         ..._all.map((e) => e.destination),
         ..._all.expand((e) => e.destinationSubs),
       }.toList()
@@ -179,19 +214,19 @@ class _ListingsPageState extends State<ListingsPage> {
                 ),
                 const SizedBox(height: 16),
                 _PublishChoiceTile(
-                  icon: Icons.person_search_outlined,
-                  title: 'ابحث عن خط',
-                  subtitle: 'انشر أنك تبحث عن خط للنقل',
-                  color: c.riderAccent,
-                  onTap: () => Navigator.pop(ctx, ListingType.rider),
-                ),
-                const SizedBox(height: 10),
-                _PublishChoiceTile(
                   icon: Icons.directions_car_outlined,
-                  title: 'سائق لديه خط',
+                  title: 'أنا سائق',
                   subtitle: 'انشر خطاً لديك مقاعد فيه',
                   color: c.accent,
                   onTap: () => Navigator.pop(ctx, ListingType.driver),
+                ),
+                const SizedBox(height: 10),
+                _PublishChoiceTile(
+                  icon: Icons.person_search_outlined,
+                  title: 'أبحث عن خط',
+                  subtitle: 'انشر أنك تبحث عن خط للنقل',
+                  color: c.riderAccent,
+                  onTap: () => Navigator.pop(ctx, ListingType.rider),
                 ),
               ],
             ),
@@ -277,7 +312,26 @@ class _ListingsPageState extends State<ListingsPage> {
                       borderRadius: BorderRadius.circular(12),
                       side: BorderSide(color: c.border),
                     ),
-                    title: Text(option.label),
+                    title: Row(
+                      children: [
+                        Text(option.label),
+                        if (option.detail != null &&
+                            option.detail!.trim().isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: SelectableText(
+                              option.detail!,
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                color: c.text.withValues(alpha: 0.75),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                     trailing: const Icon(Icons.chevron_left),
                     onTap: () => Navigator.pop(ctx, option),
                   ),
@@ -380,6 +434,8 @@ class _ListingsPageState extends State<ListingsPage> {
                                   setState(() => _areaQuery = v),
                               onDestinationQueryChanged: (v) =>
                                   setState(() => _destinationQuery = v),
+                              onAreaCommitted: _rememberArea,
+                              onDestinationCommitted: _rememberDestination,
                               onTimeSlotChanged: (v) =>
                                   setState(() => _timeSlot = v),
                               onGenderChanged: (v) =>
@@ -541,41 +597,43 @@ class _ListingTypeFilter extends StatelessWidget {
         Text(
           'نوع المنشور',
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontSize: 12,
+                fontSize: 11,
                 color: c.text.withValues(alpha: 0.55),
               ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         DecoratedBox(
           decoration: BoxDecoration(
             color: c.surface,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(color: c.border),
           ),
           child: Row(
             children: [
               for (var i = 0; i < options.length; i++) ...[
                 if (i > 0)
-                  Container(width: 1, height: 28, color: c.border),
+                  Container(width: 1, height: 20, color: c.border),
                 Expanded(
                   child: Material(
                     color: selected == options[i].$1
                         ? c.primary.withValues(alpha: 0.14)
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(11),
+                    borderRadius: BorderRadius.circular(9),
                     child: InkWell(
                       onTap: () => onChanged(options[i].$1),
-                      borderRadius: BorderRadius.circular(11),
+                      borderRadius: BorderRadius.circular(9),
                       child: SizedBox(
-                        height: 44,
+                        height: 34,
                         child: Center(
                           child: Text(
                             options[i].$2,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontWeight: selected == options[i].$1
                                   ? FontWeight.w700
                                   : FontWeight.w400,
-                              fontSize: 13,
+                              fontSize: 12,
                               color: selected == options[i].$1
                                   ? c.primary
                                   : c.text.withValues(alpha: 0.85),

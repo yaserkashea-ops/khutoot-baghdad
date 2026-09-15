@@ -1,14 +1,14 @@
 ﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <base href="/">
+  <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="لوحة تحكم خطوط بغداد — إدارة الإعلانات والاستيراد والبلاغات.">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <meta name="theme-color" content="#053F3E" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#02130D" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#F4F8F7" media="(prefers-color-scheme: dark)">
   <meta name="format-detection" content="telephone=no">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,6 +20,8 @@
   <link rel="icon" type="image/png" href="favicon-v18.png"/>
   <title>لوحة تحكم خطوط بغداد</title>
   <link rel="manifest" href="manifest-admin.json">
+  <link rel="dns-prefetch" href="https://plqhpbtkgforuvqferou.supabase.co">
+  <link rel="preconnect" href="https://plqhpbtkgforuvqferou.supabase.co" crossorigin>
   <link rel="preload" href="flutter_bootstrap.js" as="script">
 
   <style>
@@ -29,7 +31,7 @@
       margin: 0;
       padding: 0;
       overflow: hidden;
-      background-color: #02130D;
+      background-color: #F4F8F7;
       -webkit-tap-highlight-color: transparent;
       -webkit-text-size-adjust: 100%;
       touch-action: manipulation;
@@ -42,8 +44,8 @@
       align-items: center;
       justify-content: center;
       gap: 10px;
-      background: #02130D;
-      color: #F0F5F4;
+      background: #F4F8F7;
+      color: #102221;
       font-family: system-ui, "Segoe UI", Tahoma, sans-serif;
       z-index: 9999;
       transition: opacity 0.12s ease;
@@ -67,45 +69,8 @@
 
   <script>
     (function () {
-      var CACHE_BUST = 'v28';
+      var CACHE_BUST = 'v74';
       var VERSION_KEY = 'khutoot_admin_build';
-
-      (async function ensureFreshBuild() {
-        try {
-          if ('serviceWorker' in navigator) {
-            var regs = await navigator.serviceWorker.getRegistrations();
-            await Promise.all(regs.map(function (r) {
-              var url = (r.active && r.active.scriptURL) ||
-                (r.waiting && r.waiting.scriptURL) ||
-                (r.installing && r.installing.scriptURL) || '';
-              if (url.indexOf('flutter_service_worker') !== -1) {
-                return r.unregister();
-              }
-              return Promise.resolve();
-            }));
-          }
-          var res = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
-          var data = await res.json();
-          var remote = (data && data.version) || '';
-          var local = localStorage.getItem(VERSION_KEY) || '';
-          if (remote && local && remote !== local && !sessionStorage.getItem('khutoot_admin_reloading')) {
-            sessionStorage.setItem('khutoot_admin_reloading', '1');
-            if ('caches' in window) {
-              var keys = await caches.keys();
-              await Promise.all(keys.map(function (k) { return caches.delete(k); }));
-            }
-            if ('serviceWorker' in navigator) {
-              var all = await navigator.serviceWorker.getRegistrations();
-              await Promise.all(all.map(function (r) { return r.unregister(); }));
-            }
-            localStorage.setItem(VERSION_KEY, remote);
-            location.reload();
-            return;
-          }
-          if (remote) localStorage.setItem(VERSION_KEY, remote);
-          sessionStorage.removeItem('khutoot_admin_reloading');
-        } catch (_) {}
-      })();
 
       const api = {
         deferred: null,
@@ -125,15 +90,9 @@
             || (navigator.maxTouchPoints > 1 && window.innerWidth < 900);
         },
         setMode: function () {},
-        ensureAdminHash: function () {
-          return false;
-        },
-        isAdminEntry: function () {
-          return true;
-        },
-        openAdminEntry: function () {
-          return false;
-        },
+        ensureAdminHash: function () { return false; },
+        isAdminEntry: function () { return true; },
+        openAdminEntry: function () { return false; },
         promptInstall: async function () {
           if (!api.deferred) return 'unavailable';
           api.deferred.prompt();
@@ -145,10 +104,7 @@
         },
         waitForPrompt: function (ms) {
           return new Promise(function (resolve) {
-            if (api.deferred) {
-              resolve(true);
-              return;
-            }
+            if (api.deferred) { resolve(true); return; }
             var done = false;
             var timer = setTimeout(function () {
               if (done) return;
@@ -156,8 +112,7 @@
               resolve(false);
             }, ms || 2500);
             function onState() {
-              if (done) return;
-              if (!api.deferred) return;
+              if (done || !api.deferred) return;
               done = true;
               clearTimeout(timer);
               window.removeEventListener('masarat-install-state', onState);
@@ -175,7 +130,6 @@
         api.canInstall = true;
         window.dispatchEvent(new CustomEvent('masarat-install-state'));
       });
-
       window.addEventListener('appinstalled', function () {
         api.deferred = null;
         api.canInstall = false;
@@ -187,26 +141,65 @@
         navigator.serviceWorker.register('sw.js?v=' + CACHE_BUST).catch(function () {});
       }
 
+      function ensureFreshBuild() {
+        (async function () {
+          try {
+            if ('serviceWorker' in navigator) {
+              var regs = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(regs.map(function (r) {
+                var url = (r.active && r.active.scriptURL) ||
+                  (r.waiting && r.waiting.scriptURL) ||
+                  (r.installing && r.installing.scriptURL) || '';
+                if (url.indexOf('flutter_service_worker') !== -1) {
+                  return r.unregister();
+                }
+                return Promise.resolve();
+              }));
+            }
+            var res = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+            var data = await res.json();
+            var remote = (data && data.version) || '';
+            var local = localStorage.getItem(VERSION_KEY) || '';
+            if (remote && local && remote !== local && !sessionStorage.getItem('khutoot_admin_reloading')) {
+              sessionStorage.setItem('khutoot_admin_reloading', '1');
+              if ('caches' in window) {
+                var keys = await caches.keys();
+                await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+              }
+              if ('serviceWorker' in navigator) {
+                var all = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(all.map(function (r) { return r.unregister(); }));
+              }
+              localStorage.setItem(VERSION_KEY, remote);
+              location.reload();
+              return;
+            }
+            if (remote) localStorage.setItem(VERSION_KEY, remote);
+            sessionStorage.removeItem('khutoot_admin_reloading');
+          } catch (_) {}
+        })();
+      }
+
       window.addEventListener('flutter-first-frame', function () {
         const el = document.getElementById('masarat-boot');
         if (el) {
           el.style.opacity = '0';
-          setTimeout(function () { el.remove(); }, 120);
+          setTimeout(function () { el.remove(); }, 80);
         }
-        if (window.requestIdleCallback) {
-          window.requestIdleCallback(registerSw, { timeout: 2000 });
-        } else {
-          setTimeout(registerSw, 800);
-        }
+        setTimeout(function () {
+          ensureFreshBuild();
+          registerSw();
+        }, 400);
       });
       setTimeout(function () {
         const el = document.getElementById('masarat-boot');
         if (el) el.remove();
+        ensureFreshBuild();
         registerSw();
-      }, 4000);
+      }, 8000);
     })();
   </script>
 
-  <script src="flutter_bootstrap.js"></script>
+  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

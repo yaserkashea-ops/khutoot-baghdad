@@ -76,7 +76,7 @@ class Listing {
 
   String get genderLabel => switch (genderRequirement) {
         GenderRequirement.maleOnly => 'ذكور فقط',
-        GenderRequirement.femaleOnly => 'بنات فقط',
+        GenderRequirement.femaleOnly => 'اناث فقط',
         GenderRequirement.mixed => 'مختلط',
       };
 

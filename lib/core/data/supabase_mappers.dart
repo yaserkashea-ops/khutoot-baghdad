@@ -112,6 +112,8 @@ abstract final class AdminReportMapper {
       status: _statusFrom(row['status'] as String?),
       listingId: row['listing_id'] as String?,
       contactHint: row['contact_hint'] as String?,
+      contactPhone: row['contact_phone'] as String?,
+      contactTelegram: row['contact_telegram'] as String?,
       adminNote: row['admin_note'] as String?,
       createdAt: DateTime.tryParse('${row['created_at']}') ?? DateTime.now(),
       updatedAt: DateTime.tryParse('${row['updated_at']}'),
@@ -123,13 +125,30 @@ abstract final class AdminReportMapper {
     required String message,
     String? listingId,
     String? contactHint,
+    String? contactPhone,
+    String? contactTelegram,
   }) {
+    final phone = contactPhone?.trim();
+    final telegram = contactTelegram?.trim();
+    final hint = () {
+      final legacy = contactHint?.trim();
+      if (legacy != null && legacy.isNotEmpty) return legacy;
+      final parts = <String>[
+        if (phone != null && phone.isNotEmpty) phone,
+        if (telegram != null && telegram.isNotEmpty) telegram,
+      ];
+      return parts.isEmpty ? null : parts.join(' · ');
+    }();
+
     return {
       'kind': _kindTo(kind),
       'message': message,
       'status': 'open',
-      'listing_id': listingId,
-      'contact_hint': contactHint,
+      if (listingId != null && listingId.isNotEmpty) 'listing_id': listingId,
+      if (hint != null) 'contact_hint': hint,
+      // Sent only when the DB migration has been applied.
+      if (phone != null && phone.isNotEmpty) 'contact_phone': phone,
+      if (telegram != null && telegram.isNotEmpty) 'contact_telegram': telegram,
     };
   }
 

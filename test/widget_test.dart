@@ -63,7 +63,7 @@ void main() {
 
 راكب
 من الدورة للكرادة
-بنات فقط مسائي
+اناث فقط مسائي
 @test_rider
 ''';
     final drafts = ListingTextParser.parse(raw);

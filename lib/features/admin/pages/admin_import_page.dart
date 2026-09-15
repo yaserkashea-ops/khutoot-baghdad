@@ -7,6 +7,7 @@ import '../../../core/models/listing.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/listings_repository.dart';
 import '../../listings/publish_listing_page.dart';
+import '../widgets/voice_listing_wizard.dart';
 
 /// Paste Telegram / SMS ads → review → publish into the public feed.
 class AdminImportPage extends StatefulWidget {
@@ -22,23 +23,26 @@ class _AdminImportPageState extends State<AdminImportPage> {
   bool _publishing = false;
 
   static const _sample = '''
-سائق
-من المنصور إلى الجادرية
-صباحي انطلاق 7:30 عودة 2:00
-مختلط · 3 مقاعد · سيارة صالون
-07701234567
+الـــــى طالبات جامعة (بغداد و النهرين بمجمع الجادرية  ) يتوفر خط ( خصوصي ) 
+(صباحي ) يمر بالمناطق التالية
+ (حي الجامعة -  حي الخضراء  )
+المركبة (  خصوصي حديث ) 
+رقم الهاتف 07764040453 
+تلغرام @r_yzx1
 
 ---
 
-راكب
-من الدورة للكرادة
-بنات فقط مسائي
-للتواصل @baghdad_rider
+الـــــى طلبة وموظفي جامعة (بغداد و النهرين بمجمع الجادرية  ) يتوفر خط ( خصوصي ) 
+يمر بالمناطق التالية
+حي الجهاد (  الفرات - الأطباء - المخابرات - الامانة والشارقة - حي الحسين - الديوان - حي السلام وكافه المناطق المجاورة)
+المركبة (  خصوصي حديث )
+رقم الهاتف 07767740001 
+تلغرام @i_2005t
 
 ---
-مطلوب خط من السيدية إلى الجامعة التكنولوجية صباحي 7:00
-ذكور فقط
-9647801112233
+
+السلام عليكم متوفر خط من منطقة العامرية الى جامعة بغداد والسياره تدخل الى الحرم الجامعي.
+للاستفسار/07808005888
 ''';
 
   @override
@@ -98,6 +102,62 @@ class _AdminImportPageState extends State<AdminImportPage> {
       _raw.text = _sample;
       _drafts = ListingTextParser.parse(_sample);
     });
+  }
+
+  Future<void> _openVoiceWizard() async {
+    final result = await showVoiceListingWizard(context);
+    if (result == null || !mounted) return;
+    final draft = result.draft;
+    setState(() {
+      _drafts = [draft, ..._drafts];
+    });
+
+    if (result.publishNow) {
+      try {
+        await ListingsRepository.shared.insertMany([draft.listing]);
+        if (!mounted) return;
+        setState(() {
+          _drafts = [
+            for (final d in _drafts)
+              if (d.sourceText != draft.sourceText) d,
+          ];
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: context.colors.primary,
+            content: Text(
+              'نُشر الإعلان الصوتي في الأداة مباشرة',
+              style: GoogleFonts.ibmPlexSansArabic(
+                color: context.colors.onPrimary,
+              ),
+            ),
+          ),
+        );
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text(
+              'أُضيفت كمسودة لكن تعذر النشر المباشر — انشر يدوياً',
+              style: GoogleFonts.ibmPlexSansArabic(),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          'أُضيفت مسودة صوتية — راجعها ثم انشر المحدد',
+          style: GoogleFonts.ibmPlexSansArabic(),
+        ),
+      ),
+    );
   }
 
   Future<void> _editDraft(int index) async {
@@ -196,7 +256,7 @@ class _AdminImportPageState extends State<AdminImportPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                '1) الصق النص  2) اضغط «تحليل وتحويل»  3) راجع المسودات  4) انشر المحدد',
+                '1) الصق النص أو استخدم الأوامر الصوتية  2) حلّل  3) راجع  4) انشر',
                 style: GoogleFonts.ibmPlexSansArabic(
                   fontSize: 13,
                   height: 1.45,
@@ -204,7 +264,32 @@ class _AdminImportPageState extends State<AdminImportPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton.icon(
+                  onPressed: _openVoiceWizard,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: c.accent,
+                    foregroundColor: c.onPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.mic, size: 22),
+                  label: Text(
+                    'أوامر صوتية لإضافة خط',
+                    style: GoogleFonts.ibmPlexSansArabic(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   OutlinedButton.icon(
                     onPressed: _pasteFromClipboard,
@@ -221,7 +306,6 @@ class _AdminImportPageState extends State<AdminImportPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
                   TextButton(
                     onPressed: _loadSample,
                     child: Text(

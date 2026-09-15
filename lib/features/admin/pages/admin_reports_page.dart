@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/models/admin_report.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/listing_contact.dart';
 import '../../../data/admin_repository.dart';
 import '../../../data/listings_repository.dart';
 
@@ -75,10 +76,223 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
                         fontSize: 17,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 14),
                     Text(
+                      'تفاصيل المبلّغ',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: c.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SelectableText(
                       report.message,
-                      style: GoogleFonts.ibmPlexSansArabic(height: 1.5),
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        height: 1.55,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'للتواصل مع المبلّغ',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: c.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: c.surface,
+                        border: Border.all(color: c.border),
+                      ),
+                      child: report.hasStructuredContact
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'واتساب',
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    fontSize: 11,
+                                    color: c.text.withValues(alpha: 0.55),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                SelectableText(
+                                  report.phoneDisplay.isEmpty
+                                      ? '—'
+                                      : report.phoneDisplay,
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                    height: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'تلغرام',
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    fontSize: 11,
+                                    color: c.text.withValues(alpha: 0.55),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                SelectableText(
+                                  report.telegramDisplay.isEmpty
+                                      ? '—'
+                                      : report.telegramDisplay,
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : SelectableText(
+                              (report.contactHint ?? '').trim().isEmpty
+                                  ? 'لم يُذكر رقم أو تلغرام'
+                                  : report.contactHint!.trim(),
+                              style: GoogleFonts.ibmPlexSansArabic(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                                height: 1.4,
+                              ),
+                            ),
+                    ),
+                    Builder(
+                      builder: (_) {
+                        final channels = report.contactChannels(
+                          whatsappMessage:
+                              'مرحباً، تواصلنا معك بخصوص ${report.kindLabel} في خطوط بغداد.',
+                        );
+                        if (channels.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: FilledButton.icon(
+                            onPressed: () async {
+                              ContactOption? chosen = channels.length == 1
+                                  ? channels.first
+                                  : await showModalBottomSheet<ContactOption>(
+                                      context: ctx,
+                                      backgroundColor: c.background,
+                                      shape: const RoundedRectangleBorder(),
+                                      builder: (sheetCtx) {
+                                        return SafeArea(
+                                          child: Padding(
+                                            padding:
+                                                const EdgeInsets.fromLTRB(
+                                              20,
+                                              16,
+                                              20,
+                                              24,
+                                            ),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.stretch,
+                                              children: [
+                                                Text(
+                                                  'اختر وسيلة التواصل',
+                                                  textAlign: TextAlign.center,
+                                                  style: GoogleFonts
+                                                      .ibmPlexSansArabic(
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 15,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 14),
+                                                for (final ch in channels) ...[
+                                                  OutlinedButton.icon(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                      sheetCtx,
+                                                      ch,
+                                                    ),
+                                                    icon: Icon(
+                                                      ch.label == 'تلغرام'
+                                                          ? Icons.send_outlined
+                                                          : Icons.chat_outlined,
+                                                      size: 18,
+                                                    ),
+                                                    label: Text(
+                                                      ch.label,
+                                                      style: GoogleFonts
+                                                          .ibmPlexSansArabic(
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    style: OutlinedButton
+                                                        .styleFrom(
+                                                      foregroundColor:
+                                                          c.primary,
+                                                      side: BorderSide(
+                                                        color: c.primary,
+                                                      ),
+                                                      shape:
+                                                          const RoundedRectangleBorder(),
+                                                      padding:
+                                                          const EdgeInsets
+                                                              .symmetric(
+                                                        vertical: 14,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    );
+                              if (chosen == null || !ctx.mounted) return;
+                              final ok =
+                                  await ListingContact.openUrl(chosen.url);
+                              if (!ctx.mounted) return;
+                              if (!ok) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  SnackBar(
+                                    behavior: SnackBarBehavior.floating,
+                                    content: Text(
+                                      'تعذر فتح ${chosen.label}',
+                                      style: GoogleFonts.ibmPlexSansArabic(),
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                              if (status == ReportStatus.open) {
+                                setModal(
+                                  () => status = ReportStatus.inProgress,
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.forum_outlined, size: 18),
+                            label: Text(
+                              'تواصل',
+                              style: GoogleFonts.ibmPlexSansArabic(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: c.primary,
+                              foregroundColor: c.onPrimary,
+                              shape: const RoundedRectangleBorder(),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 14,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     if (report.listingId != null) ...[
                       const SizedBox(height: 8),
@@ -104,13 +318,6 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
                             ),
                           );
                         },
-                      ),
-                    ],
-                    if (report.contactHint != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        'تواصل المبلّغ: ${report.contactHint}',
-                        style: GoogleFonts.manrope(fontSize: 13),
                       ),
                     ],
                     const SizedBox(height: 16),
@@ -277,14 +484,33 @@ class _AdminReportsPageState extends State<AdminReportsPage> {
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              subtitle: Text(
-                                r.message,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.ibmPlexSansArabic(
-                                  fontSize: 13,
-                                ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    r.message,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.ibmPlexSansArabic(
+                                      fontSize: 13,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                  if (r.contactSummary.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'تواصل: ${r.contactSummary}',
+                                      style: GoogleFonts.ibmPlexSansArabic(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: c.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
+                              isThreeLine: true,
                               trailing: const Icon(Icons.chevron_left),
                             );
                           },

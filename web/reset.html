@@ -12,8 +12,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #02130D;
-      color: #EDE8E0;
+      background: #F4F8F7;
+      color: #102221;
       font-family: system-ui, "Segoe UI", Tahoma, sans-serif;
       padding: 24px;
       text-align: center;
@@ -23,7 +23,7 @@
 </head>
 <body>
   <div>
-    <p id="msg">جاري إصلاح التحديث…</p>
+    <p id="msg">جاري إصلاح التطبيق…</p>
   </div>
   <script>
     (async function () {
@@ -44,10 +44,9 @@
         localStorage.clear();
         sessionStorage.clear();
       } catch (e) {}
-      msg.textContent = 'تم الإصلاح. افتح الرابط الآن:';
-      // One redirect only — no reload loops.
+      msg.textContent = 'تم. جارٍ فتح التطبيق…';
       setTimeout(function () {
-        location.replace('https://khutoot-baghdad.web.app/');
+        location.replace('https://khutoot-baghdad.web.app/?v=72');
       }, 400);
     })();
   </script>

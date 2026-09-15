@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/data/baghdad_places.dart';
+import '../../core/data/learned_places_store.dart';
 import '../../core/models/listing.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/place_text_rules.dart';
 import '../../data/listings_repository.dart';
 import 'widgets/suggestible_text_field.dart';
 
@@ -84,16 +88,48 @@ class _PublishListingPageState extends State<PublishListingPage> {
   }
 
   Future<void> _loadPlaceOptions() async {
-    final items = await widget.repository.fetchAll();
+    final results = await Future.wait([
+      widget.repository.fetchAll(),
+      LearnedPlacesStore.areas(),
+      LearnedPlacesStore.destinations(),
+    ]);
     if (!mounted) return;
+    final items = results[0] as List<Listing>;
+    final learnedAreas = results[1] as List<String>;
+    final learnedDestinations = results[2] as List<String>;
     setState(() {
       _knownAreas = BaghdadPlaces.areasWith([
+        ...learnedAreas,
         ...items.map((e) => e.area),
         ...items.expand((e) => e.originSubs),
       ]);
       _knownDestinations = BaghdadPlaces.destinationsWith([
+        ...learnedDestinations,
         ...items.map((e) => e.destination),
         ...items.expand((e) => e.destinationSubs),
+      ]);
+    });
+  }
+
+  Future<void> _learnPlace({String? area, String? destination}) async {
+    if (area != null && area.trim().isNotEmpty) {
+      await LearnedPlacesStore.rememberArea(area);
+    }
+    if (destination != null && destination.trim().isNotEmpty) {
+      await LearnedPlacesStore.rememberDestination(destination);
+    }
+    if (!mounted) return;
+    final learnedAreas = await LearnedPlacesStore.areas();
+    final learnedDestinations = await LearnedPlacesStore.destinations();
+    if (!mounted) return;
+    setState(() {
+      _knownAreas = BaghdadPlaces.areasWith([
+        ...learnedAreas,
+        ..._knownAreas,
+      ]);
+      _knownDestinations = BaghdadPlaces.destinationsWith([
+        ...learnedDestinations,
+        ..._knownDestinations,
       ]);
     });
   }
@@ -113,9 +149,22 @@ class _PublishListingPageState extends State<PublishListingPage> {
     super.dispose();
   }
 
-  void _addToList(TextEditingController input, List<String> list, void Function(List<String>) assign) {
+  void _addToList(
+    TextEditingController input,
+    List<String> list,
+    void Function(List<String>) assign, {
+    required bool asArea,
+  }) {
     final value = input.text.trim();
     if (value.isEmpty) return;
+    final err = PlaceTextRules.validate(
+      value,
+      maxLength: PlaceTextRules.subMaxLength,
+    );
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(_toast(err));
+      return;
+    }
     if (list.contains(value)) {
       input.clear();
       return;
@@ -124,17 +173,33 @@ class _PublishListingPageState extends State<PublishListingPage> {
       assign([...list, value]);
       input.clear();
     });
+    unawaited(
+      _learnPlace(
+        area: asArea ? value : null,
+        destination: asArea ? null : value,
+      ),
+    );
   }
 
   /// Commit any typed sub-place still sitting in the input (without pressing إضافة).
   void _flushPendingSubs() {
     final originPending = _originSubInput.text.trim();
-    if (originPending.isNotEmpty && !_originSubs.contains(originPending)) {
+    if (originPending.isNotEmpty &&
+        PlaceTextRules.isAllowed(
+          originPending,
+          maxLength: PlaceTextRules.subMaxLength,
+        ) &&
+        !_originSubs.contains(originPending)) {
       _originSubs = [..._originSubs, originPending];
       _originSubInput.clear();
     }
     final destPending = _destinationSubInput.text.trim();
-    if (destPending.isNotEmpty && !_destinationSubs.contains(destPending)) {
+    if (destPending.isNotEmpty &&
+        PlaceTextRules.isAllowed(
+          destPending,
+          maxLength: PlaceTextRules.subMaxLength,
+        ) &&
+        !_destinationSubs.contains(destPending)) {
       _destinationSubs = [..._destinationSubs, destPending];
       _destinationSubInput.clear();
     }
@@ -143,6 +208,12 @@ class _PublishListingPageState extends State<PublishListingPage> {
   void _removeFromList(String value, List<String> list, void Function(List<String>) assign) {
     setState(() => assign(list.where((e) => e != value).toList()));
   }
+
+  String? _placeRequired(String? value) =>
+      PlaceTextRules.validate(value, required: true);
+
+  String? _placeOptional(String? value) =>
+      PlaceTextRules.validate(value, maxLength: PlaceTextRules.subMaxLength);
 
   String? _required(String? value) {
     if (value == null || value.trim().isEmpty) return 'مطلوب';
@@ -155,11 +226,22 @@ class _PublishListingPageState extends State<PublishListingPage> {
 
     _flushPendingSubs();
 
+    for (final s in [..._originSubs, ..._destinationSubs]) {
+      final err = PlaceTextRules.validate(
+        s,
+        maxLength: PlaceTextRules.subMaxLength,
+      );
+      if (err != null) {
+        ScaffoldMessenger.of(context).showSnackBar(_toast(err));
+        return;
+      }
+    }
+
     final phone = _phone.text.trim();
     final telegram = _telegram.text.trim();
     if (phone.isEmpty && telegram.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        _toast('أدخل رقم هاتف أو رابط/يوزر تلغرام على الأقل'),
+        _toast('أدخل واتساب (رقم/يوزر) أو تلغرام على الأقل'),
       );
       return;
     }
@@ -206,6 +288,12 @@ class _PublishListingPageState extends State<PublishListingPage> {
       );
 
       if (widget.draftOnly) {
+        await LearnedPlacesStore.rememberFromListing(
+          area: draft.area,
+          destination: draft.destination,
+          originSubs: draft.originSubs,
+          destinationSubs: draft.destinationSubs,
+        );
         if (!mounted) return;
         Navigator.of(context).pop(draft);
         return;
@@ -216,6 +304,13 @@ class _PublishListingPageState extends State<PublishListingPage> {
       } else {
         await widget.repository.insert(draft);
       }
+
+      await LearnedPlacesStore.rememberFromListing(
+        area: draft.area,
+        destination: draft.destination,
+        originSubs: draft.originSubs,
+        destinationSubs: draft.destinationSubs,
+      );
 
       if (!mounted) return;
       if (Navigator.of(context).canPop()) {
@@ -270,7 +365,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
               children: [
                 Expanded(
                   child: _TypeToggle(
-                    label: 'سائق لديه خط',
+                    label: 'أنا سائق',
                     selected: _type == ListingType.driver,
                     accent: c.accent,
                     onTap: () => setState(() => _type = ListingType.driver),
@@ -279,7 +374,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: _TypeToggle(
-                    label: 'ابحث عن خط',
+                    label: 'أبحث عن خط',
                     selected: _type == ListingType.rider,
                     accent: c.riderAccent,
                     onTap: () => setState(() => _type = ListingType.rider),
@@ -290,112 +385,127 @@ class _PublishListingPageState extends State<PublishListingPage> {
             const SizedBox(height: 14),
             SuggestibleTextField(
               fieldKey: const Key('field_area'),
-              label: 'المنطقة',
+              label: 'منطقة الانطلاق الرئيسية',
               controller: _area,
-              validator: _required,
+              validator: _placeRequired,
               options: _knownAreas,
               addMissingLabel: BaghdadPlaces.addMissingArea,
-              hint: 'اكتب أو اختر',
+              hint: 'مثال: العامرية',
+              helperText: _type == ListingType.driver
+                  ? 'المنطقة العامة التي يبدأ منها الخط'
+                  : 'المنطقة العامة التي تريد الانطلاق منها',
+              maxLength: PlaceTextRules.maxLength,
+              inputFormatters: const [PlaceTextInputFormatter()],
+              onCommitted: (v) => unawaited(_learnPlace(area: v)),
             ),
             const SizedBox(height: 10),
             SuggestibleTextField(
               fieldKey: const Key('field_destination'),
-              label: 'الوجهة',
+              label: 'الوجهة الرئيسية',
               controller: _destination,
-              hint: 'اكتب أو اختر',
-              validator: _required,
+              hint: 'مثال: الجادرية',
+              helperText: _type == ListingType.driver
+                  ? 'المنطقة العامة التي يصل إليها الخط'
+                  : 'المنطقة العامة التي تريد الوصول إليها',
+              validator: _placeRequired,
               options: _knownDestinations,
               addMissingLabel: BaghdadPlaces.addMissingDestination,
+              maxLength: PlaceTextRules.maxLength,
+              inputFormatters: const [PlaceTextInputFormatter()],
+              onCommitted: (v) => unawaited(_learnPlace(destination: v)),
             ),
             const SizedBox(height: 12),
-            Text('نقاط فرعية داخل المنطقة (من)', style: _sectionLabel(c)),
-            const SizedBox(height: 6),
-            SuggestibleTextField(
-              fieldKey: const Key('field_origin_sub'),
-              label: 'نقطة انطلاق فرعية',
-              controller: _originSubInput,
-              hint: 'اكتب أو اختر ثم أضف',
-              options: _knownAreas,
-              addMissingLabel: BaghdadPlaces.addMissingArea,
-            ),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: TextButton.icon(
-                onPressed: () => _addToList(
+            _SubPlacesBlock(
+              title: _type == ListingType.driver
+                  ? 'عناوين فرعية ينطلق منها الخط (اختياري)'
+                  : 'عنوان فرعي تنطلق منه (اختياري)',
+              hint: _type == ListingType.driver
+                  ? 'اذكر الأحياء أو الشوارع التي يمر بها الخط داخل منطقة الانطلاق'
+                  : 'اذكر الحي أو الشارع الذي تنطلق منه',
+              field: SuggestibleTextField(
+                fieldKey: const Key('field_origin_sub'),
+                label: '',
+                controller: _originSubInput,
+                hint: 'مثال: حي الجامعة',
+                options: _knownAreas,
+                addMissingLabel: BaghdadPlaces.addMissingArea,
+                validator: _placeOptional,
+                maxLength: PlaceTextRules.subMaxLength,
+                subordinate: true,
+                onCommitted: (_) => _addToList(
                   _originSubInput,
                   _originSubs,
                   (next) => _originSubs = next,
+                  asArea: true,
                 ),
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('إضافة نقطة من'),
-                style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  foregroundColor: c.primary,
-                  textStyle: GoogleFonts.ibmPlexSansArabic(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
+                inputFormatters: const [
+                  PlaceTextInputFormatter(maxLength: PlaceTextRules.subMaxLength),
+                ],
               ),
+              chips: _originSubs.isEmpty
+                  ? null
+                  : _SubChips(
+                      items: _originSubs,
+                      onRemove: (v) => _removeFromList(
+                        v,
+                        _originSubs,
+                        (next) => _originSubs = next,
+                      ),
+                    ),
             ),
-            if (_originSubs.isNotEmpty)
-              _SubChips(
-                items: _originSubs,
-                onRemove: (v) => _removeFromList(
-                  v,
-                  _originSubs,
-                  (next) => _originSubs = next,
-                ),
-              ),
             const SizedBox(height: 10),
-            Text('نقاط فرعية داخل الوجهة (إلى)', style: _sectionLabel(c)),
-            const SizedBox(height: 6),
-            SuggestibleTextField(
-              fieldKey: const Key('field_destination_sub'),
-              label: 'نقطة وصول فرعية',
-              controller: _destinationSubInput,
-              hint: 'اكتب أو اختر ثم أضف',
-              options: _knownDestinations,
-              addMissingLabel: BaghdadPlaces.addMissingDestination,
-            ),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: TextButton.icon(
-                onPressed: () => _addToList(
+            _SubPlacesBlock(
+              title: _type == ListingType.driver
+                  ? 'عناوين فرعية يصل إليها الخط (اختياري)'
+                  : 'عنوان فرعي تصل إليه (اختياري)',
+              hint: _type == ListingType.driver
+                  ? 'اذكر الأحياء أو الشوارع التي يصل إليها الخط داخل الوجهة'
+                  : 'اذكر الحي أو الشارع أو الجامعة أو الدائرة التي تصل إليها',
+              field: SuggestibleTextField(
+                fieldKey: const Key('field_destination_sub'),
+                label: '',
+                controller: _destinationSubInput,
+                hint: _type == ListingType.driver
+                    ? 'مثال: مجمع الجادرية'
+                    : 'مثال: جامعة بغداد',
+                options: _knownDestinations,
+                addMissingLabel: BaghdadPlaces.addMissingDestination,
+                validator: _placeOptional,
+                maxLength: PlaceTextRules.subMaxLength,
+                subordinate: true,
+                onCommitted: (_) => _addToList(
                   _destinationSubInput,
                   _destinationSubs,
                   (next) => _destinationSubs = next,
+                  asArea: false,
                 ),
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('إضافة نقطة إلى'),
-                style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  foregroundColor: c.primary,
-                  textStyle: GoogleFonts.ibmPlexSansArabic(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
+                inputFormatters: const [
+                  PlaceTextInputFormatter(maxLength: PlaceTextRules.subMaxLength),
+                ],
               ),
+              chips: _destinationSubs.isEmpty
+                  ? null
+                  : _SubChips(
+                      items: _destinationSubs,
+                      onRemove: (v) => _removeFromList(
+                        v,
+                        _destinationSubs,
+                        (next) => _destinationSubs = next,
+                      ),
+                    ),
             ),
-            if (_destinationSubs.isNotEmpty)
-              _SubChips(
-                items: _destinationSubs,
-                onRemove: (v) => _removeFromList(
-                  v,
-                  _destinationSubs,
-                  (next) => _destinationSubs = next,
-                ),
-              ),
             if (_originSubs.isNotEmpty || _destinationSubs.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(
-                '${_originSubs.isEmpty ? '—' : _originSubs.join('، ')}  ←  ${_destinationSubs.isEmpty ? '—' : _destinationSubs.join('، ')}',
-                style: GoogleFonts.ibmPlexSansArabic(
-                  fontWeight: FontWeight.w400,
-                  fontSize: 12,
-                  height: 1.4,
-                  color: c.primary,
+              Padding(
+                padding: const EdgeInsetsDirectional.only(start: 10),
+                child: Text(
+                  '${_originSubs.isEmpty ? '—' : _originSubs.join('، ')}  ←  ${_destinationSubs.isEmpty ? '—' : _destinationSubs.join('، ')}',
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 11,
+                    height: 1.4,
+                    color: c.primary.withValues(alpha: 0.85),
+                  ),
                 ),
               ),
             ],
@@ -482,7 +592,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
                         Expanded(
                           child: _ChoiceChip(
                             label: switch (option) {
-                              GenderRequirement.femaleOnly => 'بنات',
+                              GenderRequirement.femaleOnly => 'اناث',
                               GenderRequirement.maleOnly => 'ذكور',
                               GenderRequirement.mixed => 'مختلط',
                             },
@@ -497,18 +607,6 @@ class _PublishListingPageState extends State<PublishListingPage> {
                   Align(
                     alignment: AlignmentDirectional.centerStart,
                     child: Text('ساعات الانطلاق والعودة', style: _sectionLabel(c)),
-                  ),
-                  const SizedBox(height: 2),
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: Text(
-                      'اختياري — يمكن تركهما فارغين',
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        fontWeight: FontWeight.w400,
-                        fontSize: 11,
-                        color: c.text.withValues(alpha: 0.5),
-                      ),
-                    ),
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -541,7 +639,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
             Text('وسيلة التواصل', style: _sectionLabel(c)),
             const SizedBox(height: 2),
             Text(
-              'هاتف و/أو تلغرام — واحد منهما على الأقل',
+              'واتساب أو تلغرام — واحد منهما على الأقل',
               style: GoogleFonts.ibmPlexSansArabic(
                 fontWeight: FontWeight.w400,
                 fontSize: 11,
@@ -551,9 +649,10 @@ class _PublishListingPageState extends State<PublishListingPage> {
             const SizedBox(height: 6),
             _Field(
               fieldKey: const Key('field_phone'),
-              label: 'رقم الهاتف',
+              label: 'واتساب (رقم أو يوزر)',
               controller: _phone,
-              keyboardType: TextInputType.phone,
+              keyboardType: TextInputType.text,
+              hint: '07XXXXXXXXX أو @username',
               style: AppTheme.manrope(fontSize: 14, color: c.text),
             ),
             const SizedBox(height: 10),
@@ -606,6 +705,69 @@ class _PublishListingPageState extends State<PublishListingPage> {
       fontWeight: FontWeight.w600,
       fontSize: 11,
       color: c.text.withValues(alpha: 0.5),
+    );
+  }
+}
+
+/// Nested block so sub-place fields read as secondary to the main places.
+class _SubPlacesBlock extends StatelessWidget {
+  const _SubPlacesBlock({
+    required this.title,
+    required this.hint,
+    required this.field,
+    this.chips,
+  });
+
+  final String title;
+  final String hint;
+  final Widget field;
+  final Widget? chips;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      margin: const EdgeInsetsDirectional.only(start: 10),
+      padding: const EdgeInsetsDirectional.fromSTEB(10, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: c.text.withValues(alpha: 0.035),
+        borderRadius: BorderRadius.circular(8),
+        border: BorderDirectional(
+          start: BorderSide(
+            color: c.primary.withValues(alpha: 0.28),
+            width: 2.5,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontWeight: FontWeight.w600,
+              fontSize: 10,
+              color: c.text.withValues(alpha: 0.45),
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            hint,
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontWeight: FontWeight.w400,
+              fontSize: 11,
+              height: 1.35,
+              color: c.text.withValues(alpha: 0.52),
+            ),
+          ),
+          const SizedBox(height: 6),
+          field,
+          if (chips != null) ...[
+            const SizedBox(height: 4),
+            chips!,
+          ],
+        ],
+      ),
     );
   }
 }

@@ -1,4 +1,5 @@
 import '../config/admin_contact.dart';
+import '../utils/listing_contact.dart';
 
 enum ReportStatus { open, inProgress, resolved, dismissed }
 
@@ -11,6 +12,8 @@ class AdminReport {
     required this.createdAt,
     this.listingId,
     this.contactHint,
+    this.contactPhone,
+    this.contactTelegram,
     this.adminNote,
     this.updatedAt,
   });
@@ -21,7 +24,10 @@ class AdminReport {
   final ReportStatus status;
   final DateTime createdAt;
   final String? listingId;
+  /// Legacy single free-text field (older reports).
   final String? contactHint;
+  final String? contactPhone;
+  final String? contactTelegram;
   final String? adminNote;
   final DateTime? updatedAt;
 
@@ -33,6 +39,55 @@ class AdminReport {
         ReportStatus.resolved => 'محلول',
         ReportStatus.dismissed => 'مرفوض',
       };
+
+  String get phoneDisplay => (contactPhone ?? '').trim();
+  String get telegramDisplay => (contactTelegram ?? '').trim();
+
+  bool get hasStructuredContact =>
+      phoneDisplay.isNotEmpty || telegramDisplay.isNotEmpty;
+
+  List<ContactOption> contactChannels({String? whatsappMessage}) {
+    final structured = ListingContact.optionsForChannels(
+      phone: contactPhone,
+      telegram: contactTelegram,
+      whatsappMessage: whatsappMessage,
+    );
+    if (structured.isNotEmpty) return structured;
+
+    final hint = (contactHint ?? '').trim();
+    if (hint.contains(' · ')) {
+      final parts = hint.split(' · ').map((e) => e.trim()).where((e) => e.isNotEmpty);
+      String? phone;
+      String? telegram;
+      for (final p in parts) {
+        if (ListingContact.whatsappUrl(p) != null) {
+          phone ??= p;
+        } else if (ListingContact.telegramUrl(p) != null) {
+          telegram ??= p;
+        }
+      }
+      final split = ListingContact.optionsForChannels(
+        phone: phone,
+        telegram: telegram,
+        whatsappMessage: whatsappMessage,
+      );
+      if (split.isNotEmpty) return split;
+    }
+
+    return ListingContact.optionsForHint(
+      contactHint,
+      whatsappMessage: whatsappMessage,
+    );
+  }
+
+  String get contactSummary {
+    final parts = <String>[];
+    if (phoneDisplay.isNotEmpty) parts.add(phoneDisplay);
+    if (telegramDisplay.isNotEmpty) parts.add(telegramDisplay);
+    if (parts.isNotEmpty) return parts.join(' · ');
+    final legacy = (contactHint ?? '').trim();
+    return legacy;
+  }
 
   AdminReport copyWith({
     ReportStatus? status,
@@ -47,6 +102,8 @@ class AdminReport {
       createdAt: createdAt,
       listingId: listingId,
       contactHint: contactHint,
+      contactPhone: contactPhone,
+      contactTelegram: contactTelegram,
       adminNote: adminNote ?? this.adminNote,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -60,6 +117,8 @@ class AdminStats {
     required this.riders,
     required this.reportsOpen,
     required this.reportsTotal,
+    this.outreachFresh = 0,
+    this.outreachTotal = 0,
   });
 
   final int listingsTotal;
@@ -67,4 +126,6 @@ class AdminStats {
   final int riders;
   final int reportsOpen;
   final int reportsTotal;
+  final int outreachFresh;
+  final int outreachTotal;
 }

@@ -23,6 +23,8 @@ class FilterChipsBar extends StatelessWidget {
     required this.onGenderChanged,
     required this.onDepartureQueryChanged,
     required this.onReturnQueryChanged,
+    this.onAreaCommitted,
+    this.onDestinationCommitted,
   });
 
   final List<String> areas;
@@ -40,6 +42,8 @@ class FilterChipsBar extends StatelessWidget {
   final ValueChanged<String?> onGenderChanged;
   final ValueChanged<String> onDepartureQueryChanged;
   final ValueChanged<String> onReturnQueryChanged;
+  final ValueChanged<String>? onAreaCommitted;
+  final ValueChanged<String>? onDestinationCommitted;
 
   static const genderOptions = <(String key, String label)>[
     ('female_only', 'بنات'),
@@ -204,6 +208,7 @@ class FilterChipsBar extends StatelessWidget {
           options: areaOptions,
           addMissingLabel: BaghdadPlaces.addMissingArea,
           onChanged: onAreaQueryChanged,
+          onCommitted: onAreaCommitted,
         ),
         const SizedBox(height: 10),
         _DropdownSearchField(
@@ -213,6 +218,7 @@ class FilterChipsBar extends StatelessWidget {
           options: destinationOptions,
           addMissingLabel: BaghdadPlaces.addMissingDestination,
           onChanged: onDestinationQueryChanged,
+          onCommitted: onDestinationCommitted,
         ),
         const SizedBox(height: 12),
         Text(
@@ -388,6 +394,7 @@ class _DropdownSearchField extends StatefulWidget {
     required this.options,
     required this.onChanged,
     required this.addMissingLabel,
+    this.onCommitted,
   });
 
   final String label;
@@ -396,6 +403,7 @@ class _DropdownSearchField extends StatefulWidget {
   final List<String> options;
   final ValueChanged<String> onChanged;
   final String addMissingLabel;
+  final ValueChanged<String>? onCommitted;
 
   @override
   State<_DropdownSearchField> createState() => _DropdownSearchFieldState();
@@ -469,6 +477,8 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
   }
 
   Iterable<String> _buildOptions(TextEditingValue value) {
+    if (!_menuOpen) return const Iterable<String>.empty();
+
     final seen = <String>{};
     final pool = <String>[];
     for (final o in widget.options) {
@@ -496,6 +506,9 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
       _controller.selection = TextSelection.collapsed(offset: text.length);
     }
     widget.onChanged(text);
+    if (text.isNotEmpty) {
+      widget.onCommitted?.call(text);
+    }
     _focusNode.unfocus();
   }
 
@@ -550,17 +563,9 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => _commitTyped(),
                   onChanged: (_) {
-                    setState(() {
-                      _showAll = false;
-                      _menuOpen = true;
-                    });
-                  },
-                  onTap: () {
-                    if (!_menuOpen) {
-                      setState(() {
-                        _menuOpen = true;
-                        _showAll = textController.text.trim().isEmpty;
-                      });
+                    // Filter open list while typing — never auto-open on type.
+                    if (_menuOpen) {
+                      setState(() => _showAll = false);
                     }
                   },
                   decoration: InputDecoration(
@@ -634,6 +639,7 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
                 );
               },
               optionsViewBuilder: (context, onSelected, optionsIterable) {
+                if (!_menuOpen) return const SizedBox.shrink();
                 final opts = optionsIterable.toList();
                 if (opts.isEmpty) return const SizedBox.shrink();
                 return Align(

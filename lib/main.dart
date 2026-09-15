@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'admin_app.dart';
 import 'app.dart';
 import 'core/auth/admin_auth_controller.dart';
+import 'core/bootstrap/app_bootstrap.dart';
 import 'core/config/app_hosts.dart';
 import 'core/config/supabase_config.dart';
 import 'core/theme/theme_controller.dart';
@@ -13,24 +14,32 @@ import 'data/listings_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Avoid blocking first paint on font CDN when offline / slow network.
   GoogleFonts.config.allowRuntimeFetching = true;
 
   final isAdmin = AppHosts.isAdminHost;
 
-  // Theme + Supabase in parallel (was sequential).
-  await Future.wait<void>([
-    ThemeController.shared.load(),
-    _initSupabase(),
-  ]);
-
-  // Admin auth only on the admin host — public app skips this wait.
+  // Paint UI immediately — never wait on network before first frame
+  // (waiting here caused the permanent green splash on slow/mobile).
   if (isAdmin) {
-    await AdminAuthController.shared.load();
     runApp(const AdminApp());
   } else {
     runApp(const MasaratApp());
+  }
+
+  try {
+    await Future.wait<void>([
+      ThemeController.shared.load(),
+      _initSupabase(),
+    ]).timeout(const Duration(seconds: 8));
+    if (isAdmin) {
+      await AdminAuthController.shared
+          .load()
+          .timeout(const Duration(seconds: 5));
+    }
+  } catch (_) {
+    // UI already visible; listings/admin can show errors if needed.
+  } finally {
+    AppBootstrap.markReady();
   }
 }
 

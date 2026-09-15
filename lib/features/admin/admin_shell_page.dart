@@ -8,8 +8,11 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_toggle_button.dart';
 import 'admin_gate_page.dart';
 import 'pages/admin_dashboard_page.dart';
+import 'pages/admin_duplicates_page.dart';
 import 'pages/admin_import_page.dart';
+import 'pages/admin_invites_page.dart';
 import 'pages/admin_listings_page.dart';
+import 'pages/admin_published_contacts_page.dart';
 import 'pages/admin_reports_page.dart';
 import 'pages/admin_settings_page.dart';
 
@@ -26,7 +29,10 @@ class _AdminShellPageState extends State<AdminShellPage> {
   static const _titles = [
     'نظرة عامة',
     'الإعلانات',
+    'جهات المنشورات',
+    'المكرر',
     'استيراد',
+    'دعوات',
     'البلاغات',
     'الإعدادات',
   ];
@@ -50,13 +56,16 @@ class _AdminShellPageState extends State<AdminShellPage> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final pages = [
-      AdminDashboardPage(onOpenTab: (i) => setState(() => _index = i)),
-      const AdminListingsPage(),
-      const AdminImportPage(),
-      const AdminReportsPage(),
-      const AdminSettingsPage(),
-    ];
+    final page = switch (_index) {
+      0 => AdminDashboardPage(onOpenTab: (i) => setState(() => _index = i)),
+      1 => const AdminListingsPage(),
+      2 => const AdminPublishedContactsPage(),
+      3 => const AdminDuplicatesPage(),
+      4 => const AdminImportPage(),
+      5 => const AdminInvitesPage(),
+      6 => const AdminReportsPage(),
+      _ => const AdminSettingsPage(),
+    };
 
     return Scaffold(
       appBar: AppBar(
@@ -79,7 +88,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
           ),
         ],
       ),
-      body: pages[_index],
+      body: page,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         backgroundColor: c.background,
@@ -98,9 +107,24 @@ class _AdminShellPageState extends State<AdminShellPage> {
             label: 'إعلانات',
           ),
           NavigationDestination(
+            icon: const Icon(Icons.contacts_outlined),
+            selectedIcon: Icon(Icons.contacts, color: c.primary),
+            label: 'جهات',
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.copy_all_outlined),
+            selectedIcon: Icon(Icons.copy_all, color: c.primary),
+            label: 'مكرر',
+          ),
+          NavigationDestination(
             icon: const Icon(Icons.upload_file_outlined),
             selectedIcon: Icon(Icons.upload_file, color: c.primary),
             label: 'استيراد',
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.campaign_outlined),
+            selectedIcon: Icon(Icons.campaign, color: c.primary),
+            label: 'دعوات',
           ),
           NavigationDestination(
             icon: const Icon(Icons.flag_outlined),

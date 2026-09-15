@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/auth/admin_auth_controller.dart';
+import '../../core/bootstrap/app_bootstrap.dart';
 import '../../core/config/admin_config.dart';
 import '../../core/pwa/install_app_button.dart';
 import '../../core/theme/app_colors.dart';
@@ -28,6 +29,9 @@ class _AdminGatePageState extends State<AdminGatePage> {
   }
 
   Future<void> _bootstrap() async {
+    try {
+      await AppBootstrap.ready.timeout(const Duration(seconds: 8));
+    } catch (_) {}
     final auth = AdminAuthController.shared;
     if (!auth.isLoaded) await auth.load();
     if (!mounted) return;
