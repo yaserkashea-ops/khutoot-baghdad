@@ -6,7 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import 'place_options_menu.dart';
 
 /// Text field with suggestion list. Free typing is always allowed.
-/// The options menu opens/closes only via the arrow — without opening the keyboard.
+/// Arrow toggles the full list without keyboard; typing shows filtered suggestions.
 class SuggestibleTextField extends StatefulWidget {
   const SuggestibleTextField({
     super.key,
@@ -77,13 +77,52 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
   }
 
   void _onTextChanged() {
-    if (_menu.isOpen) _menu.refilter();
+    _syncSuggestionsWhileTyping();
   }
 
   void _onFocusChange() {
     if (!_focusNode.hasFocus) {
       _emitCommitted(unfocus: false);
     }
+  }
+
+  void _syncSuggestionsWhileTyping() {
+    if (!_focusNode.hasFocus) return;
+    final q = widget.controller.text.trim();
+    if (q.isEmpty) {
+      if (_menu.isOpen) {
+        _menu.close();
+        if (mounted) setState(() {});
+      }
+      return;
+    }
+    if (_menu.isOpen) {
+      _menu.refilter();
+      return;
+    }
+    if (!mounted) return;
+    _menu.open(
+      context: context,
+      width: _fieldWidth,
+      optionsOf: () => widget.options,
+      queryOf: () => widget.controller.text,
+      maxHeight: widget.subordinate ? 160 : 200,
+      tapRegionGroupId: _tapGroup,
+      keepFocus: true,
+      showAll: false,
+      onSelected: _selectOption,
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
+  void _selectOption(String value) {
+    widget.controller.text = value;
+    widget.controller.selection =
+        TextSelection.collapsed(offset: value.length);
+    _emitCommitted(unfocus: true);
+    if (mounted) setState(() {});
   }
 
   void _toggleDropdown() {
@@ -95,13 +134,7 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
       maxHeight: widget.subordinate ? 160 : 200,
       tapRegionGroupId: _tapGroup,
       keepFocus: false,
-      onSelected: (value) {
-        widget.controller.text = value;
-        widget.controller.selection =
-            TextSelection.collapsed(offset: value.length);
-        _emitCommitted(unfocus: true);
-        if (mounted) setState(() {});
-      },
+      onSelected: _selectOption,
       onChanged: () {
         if (mounted) setState(() {});
       },
