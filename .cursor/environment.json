@@ -1,0 +1,17 @@
+{
+  "name": "خطوط بغداد (Khutoot Baghdad)",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "flutter web",
+      "command": "flutter run -d web-server --web-port 8080 --web-hostname 0.0.0.0",
+      "description": "Flutter web dev server for the public app. Serves http://localhost:8080. Supports hot restart via the `R` key in this terminal."
+    }
+  ],
+  "ports": [
+    {
+      "name": "flutter web",
+      "port": 8080
+    }
+  ]
+}
