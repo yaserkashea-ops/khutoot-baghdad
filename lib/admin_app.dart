@@ -11,12 +11,16 @@ import 'features/admin/admin_gate_page.dart';
 class AdminApp extends StatelessWidget {
   const AdminApp({super.key});
 
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: ThemeController.shared,
       builder: (context, _) {
         return MaterialApp(
+          navigatorKey: navigatorKey,
           title: AdminConfig.title,
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light,

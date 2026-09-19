@@ -11,18 +11,16 @@ class ListingCard extends StatelessWidget {
     required this.listing,
     this.onContact,
     this.highlighted = false,
+    this.badgeLabel,
   });
 
   final Listing listing;
   final VoidCallback? onContact;
   final bool highlighted;
+  /// Optional top ribbon (e.g. مطابقة جديدة) — preferred over [highlighted] copy.
+  final String? badgeLabel;
 
-  String get _typeTitle => listing.isDriver
-      ? 'سائق لديه خط'
-      : 'يبحث عن خط';
-
-  String get _contactLabel =>
-      listing.isDriver ? 'تواصل مع السائق' : 'تواصل';
+  String get _contactLabel => 'تواصل مع السائق';
 
   String get _subsLine {
     final from =
@@ -33,7 +31,7 @@ class ListingCard extends StatelessWidget {
   }
 
   String? get _publishedLabel {
-    final at = listing.createdAt?.toLocal();
+    final at = (listing.bumpedAt ?? listing.createdAt)?.toLocal();
     if (at == null) return null;
     final diff = DateTime.now().difference(at);
     if (diff.isNegative || diff.inSeconds < 45) {
@@ -86,10 +84,14 @@ class ListingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final badgeColor = listing.isDriver ? c.accent : c.riderAccent;
+    final badgeColor = c.accent;
+    final ribbon = (badgeLabel != null && badgeLabel!.trim().isNotEmpty)
+        ? badgeLabel!.trim()
+        : (highlighted ? 'خطك — يظهر الآن في الدليل' : null);
+    final emphasize = ribbon != null;
 
     return Material(
-      color: highlighted
+      color: emphasize
           ? badgeColor.withValues(alpha: 0.06)
           : c.surface,
       borderRadius: BorderRadius.circular(14),
@@ -98,19 +100,19 @@ class ListingCard extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: highlighted
+            color: emphasize
                 ? badgeColor.withValues(alpha: 0.85)
                 : c.border,
-            width: highlighted ? 1.6 : 1,
+            width: emphasize ? 1.6 : 1,
           ),
         ),
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (highlighted) ...[
+            if (ribbon != null) ...[
               Text(
-                'منشورك — يظهر الآن للآخرين',
+                ribbon,
                 style: GoogleFonts.ibmPlexSansArabic(
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
@@ -119,42 +121,6 @@ class ListingCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
             ],
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: badgeColor.withValues(alpha: 0.12),
-                  border: Border.all(
-                    color: badgeColor.withValues(alpha: 0.45),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      listing.isDriver
-                          ? Icons.directions_car_outlined
-                          : Icons.person_search_outlined,
-                      size: 14,
-                      color: badgeColor,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _typeTitle,
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                        color: badgeColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
             Text(
               '${listing.area} ← ${listing.destination}',
               softWrap: true,

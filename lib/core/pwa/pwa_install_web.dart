@@ -17,11 +17,16 @@ extension type _PwaApi._(JSObject _) implements JSObject {
   external bool openAdminEntry();
   external JSPromise<JSAny?> promptInstall();
   external JSPromise<JSBoolean> waitForPrompt(JSNumber ms);
+  external JSPromise<JSBoolean> recordInstall(String source);
+  external void showInstallButton(String label, JSNumber bottomPx);
+  external void hideInstallButton();
 }
 
 class PwaInstall {
   static final StreamController<void> _controller =
       StreamController<void>.broadcast();
+  static final StreamController<String> _outcomeController =
+      StreamController<String>.broadcast();
 
   static bool _listening = false;
 
@@ -34,6 +39,30 @@ class PwaInstall {
         if (!_controller.isClosed) _controller.add(null);
       }.toJS,
     );
+    web.window.addEventListener(
+      'masarat-install-outcome',
+      (web.Event event) {
+        try {
+          final custom = event as web.CustomEvent;
+          final detail = custom.detail;
+          var outcome = 'unavailable';
+          if (detail != null) {
+            if (detail.isA<JSString>()) {
+              outcome = (detail as JSString).toDart;
+            } else {
+              outcome = detail.dartify()?.toString() ?? 'unavailable';
+            }
+          }
+          if (!_outcomeController.isClosed) {
+            _outcomeController.add(outcome);
+          }
+        } catch (_) {
+          if (!_outcomeController.isClosed) {
+            _outcomeController.add('unavailable');
+          }
+        }
+      }.toJS,
+    );
   }
 
   static bool get isStandalone {
@@ -42,6 +71,15 @@ class PwaInstall {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Ask the page script to persist an install (survives Flutter teardown).
+  static Future<void> recordInstallInBrowser({String source = 'app'}) async {
+    try {
+      final api = _api;
+      if (api == null) return;
+      await api.recordInstall(source).toDart;
+    } catch (_) {}
   }
 
   static bool get canNativeInstall {
@@ -81,6 +119,12 @@ class PwaInstall {
     return _controller.stream;
   }
 
+  /// Outcomes from the native HTML install hit-target button.
+  static Stream<String> get onInstallOutcome {
+    _ensureListening();
+    return _outcomeController.stream;
+  }
+
   static void setMode(String mode) {
     try {
       _api?.setMode(mode);
@@ -101,6 +145,22 @@ class PwaInstall {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Real DOM button so Chrome keeps the user gesture for [prompt].
+  static void showNativeInstallButton({
+    required String label,
+    double bottomPx = 88,
+  }) {
+    try {
+      _api?.showInstallButton(label, bottomPx.toJS);
+    } catch (_) {}
+  }
+
+  static void hideNativeInstallButton() {
+    try {
+      _api?.hideInstallButton();
+    } catch (_) {}
   }
 
   static Future<bool> waitForPrompt({

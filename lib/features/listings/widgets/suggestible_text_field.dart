@@ -1,12 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/config/admin_contact.dart';
+import '../../../core/data/baghdad_places.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/place_text_rules.dart';
+import '../../support/contact_admin_sheet.dart';
 import 'place_options_menu.dart';
 
-/// Text field with suggestion list. Free typing is always allowed.
-/// Arrow toggles the full list without keyboard; typing shows filtered suggestions.
+/// Text field with suggestion list.
+/// When [listedOnly] is true, only catalog options may be committed.
 class SuggestibleTextField extends StatefulWidget {
   const SuggestibleTextField({
     super.key,
@@ -22,6 +28,7 @@ class SuggestibleTextField extends StatefulWidget {
     this.inputFormatters,
     this.onCommitted,
     this.subordinate = false,
+    this.listedOnly = false,
   });
 
   final Key? fieldKey;
@@ -38,6 +45,8 @@ class SuggestibleTextField extends StatefulWidget {
   final ValueChanged<String>? onCommitted;
   /// Visually secondary (smaller, quieter) vs main place fields.
   final bool subordinate;
+  /// Reject free text; only values from [options] are accepted.
+  final bool listedOnly;
 
   @override
   State<SuggestibleTextField> createState() => _SuggestibleTextFieldState();
@@ -48,12 +57,18 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
   late final PlaceOptionsMenuController _menu;
   final Object _tapGroup = Object();
   double _fieldWidth = 280;
+  bool _applyingSuggestion = false;
+  String? _typedBeforeArm;
+  String _committedListed = '';
 
   @override
   void initState() {
     super.initState();
     _focusNode = FocusNode();
     _menu = PlaceOptionsMenuController();
+    _committedListed =
+        PlaceTextRules.resolveListed(widget.controller.text, widget.options) ??
+            '';
     _focusNode.addListener(_onFocusChange);
     widget.controller.addListener(_onTextChanged);
   }
@@ -77,16 +92,59 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
   }
 
   void _onTextChanged() {
+    if (_applyingSuggestion) return;
     _syncSuggestionsWhileTyping();
   }
 
   void _onFocusChange() {
     if (!_focusNode.hasFocus) {
+      if (_applyingSuggestion || _menu.isOpen) return;
       _emitCommitted(unfocus: false);
     }
   }
 
+  void _setControllerText(String value) {
+    widget.controller.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+  }
+
+  void _armSelect(String value) {
+    if (widget.addMissingLabel != null && value == widget.addMissingLabel) {
+      return;
+    }
+    _applyingSuggestion = true;
+    _typedBeforeArm ??= widget.controller.text;
+    _setControllerText(value);
+  }
+
+  void _cancelArm() {
+    final restore = _typedBeforeArm;
+    _typedBeforeArm = null;
+    if (restore != null) {
+      _setControllerText(restore);
+    }
+    _applyingSuggestion = false;
+  }
+
+  Future<void> _openAddPlaceRequest(String typed) async {
+    final isDestination =
+        widget.addMissingLabel == BaghdadPlaces.addMissingDestination;
+    final placeHint = typed.isEmpty ? '……' : typed;
+    final message = isDestination
+        ? 'أرغب بإضافة الوجهة التالية إلى قائمة النشر: $placeHint'
+        : 'أرغب بإضافة المنطقة التالية إلى قائمة النشر: $placeHint';
+    if (!mounted) return;
+    await showContactAdminSheet(
+      context,
+      initialKind: AdminContactKind.problem,
+      initialMessage: message,
+    );
+  }
+
   void _syncSuggestionsWhileTyping() {
+    if (_applyingSuggestion) return;
     if (!_focusNode.hasFocus) return;
     final q = widget.controller.text.trim();
     if (q.isEmpty) {
@@ -110,7 +168,10 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
       tapRegionGroupId: _tapGroup,
       keepFocus: true,
       showAll: false,
+      trailingOption: widget.listedOnly ? widget.addMissingLabel : null,
       onSelected: _selectOption,
+      onArmSelect: _armSelect,
+      onCancelArm: _cancelArm,
       onChanged: () {
         if (mounted) setState(() {});
       },
@@ -118,11 +179,27 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
   }
 
   void _selectOption(String value) {
-    widget.controller.text = value;
-    widget.controller.selection =
-        TextSelection.collapsed(offset: value.length);
-    _emitCommitted(unfocus: true);
-    if (mounted) setState(() {});
+    if (widget.addMissingLabel != null && value == widget.addMissingLabel) {
+      final typed = (_typedBeforeArm ?? widget.controller.text).trim();
+      _cancelArm();
+      _menu.close();
+      _focusNode.unfocus();
+      unawaited(_openAddPlaceRequest(typed));
+      return;
+    }
+    _applyingSuggestion = true;
+    _typedBeforeArm = null;
+    _committedListed = value;
+    _setControllerText(value);
+    _menu.close();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _setControllerText(value);
+      _applyingSuggestion = false;
+      widget.onCommitted?.call(value);
+      _focusNode.unfocus();
+      if (mounted) setState(() {});
+    });
   }
 
   void _toggleDropdown() {
@@ -134,7 +211,10 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
       maxHeight: widget.subordinate ? 160 : 200,
       tapRegionGroupId: _tapGroup,
       keepFocus: false,
+      trailingOption: widget.listedOnly ? widget.addMissingLabel : null,
       onSelected: _selectOption,
+      onArmSelect: _armSelect,
+      onCancelArm: _cancelArm,
       onChanged: () {
         if (mounted) setState(() {});
       },
@@ -143,10 +223,34 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
 
   void _emitCommitted({required bool unfocus}) {
     final text = widget.controller.text.trim();
+    if (widget.listedOnly) {
+      if (text.isEmpty) {
+        if (unfocus) _focusNode.unfocus();
+        return;
+      }
+      final listed = PlaceTextRules.resolveListed(text, widget.options);
+      if (listed != null) {
+        _committedListed = listed;
+        if (widget.controller.text != listed) {
+          _setControllerText(listed);
+        }
+        widget.onCommitted?.call(listed);
+        if (unfocus) _focusNode.unfocus();
+        return;
+      }
+      // Free text rejected — restore last listed (or clear) and ask admin.
+      final typed = text;
+      _applyingSuggestion = true;
+      _setControllerText(_committedListed);
+      _applyingSuggestion = false;
+      if (mounted) setState(() {});
+      unawaited(_openAddPlaceRequest(typed));
+      if (unfocus) _focusNode.unfocus();
+      return;
+    }
+
     if (widget.controller.text != text) {
-      widget.controller.text = text;
-      widget.controller.selection =
-          TextSelection.collapsed(offset: text.length);
+      _setControllerText(text);
     }
     if (text.isNotEmpty) {
       widget.onCommitted?.call(text);
@@ -200,7 +304,10 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
               onTapOutside: (_) {
                 if (_menu.isOpen) {
                   _menu.close();
+                  _applyingSuggestion = false;
+                  _typedBeforeArm = null;
                   setState(() {});
+                  _emitCommitted(unfocus: false);
                 }
               },
               child: KeyedSubtree(
@@ -220,7 +327,10 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
                     if (mounted) setState(() {});
                   },
                   decoration: InputDecoration(
-                    hintText: widget.hint ?? 'اكتب يدوياً أو اختر',
+                    hintText: widget.hint ??
+                        (widget.listedOnly
+                            ? 'اختر من القائمة'
+                            : 'اكتب يدوياً أو اختر'),
                     counterText: '',
                     hintStyle: GoogleFonts.ibmPlexSansArabic(
                       fontWeight: FontWeight.w400,

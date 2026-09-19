@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/admin_contact.dart';
+import '../core/data/places_catalog.dart';
 import '../core/data/supabase_mappers.dart';
 import '../core/models/admin_report.dart';
 import '../core/models/outreach_lead.dart';
@@ -234,14 +235,46 @@ class AdminRepository {
       } catch (_) {
         // Table may not exist until migrate_outreach_leads.sql is applied.
       }
+      var publisherTotal = 0;
+      var publisherDrivers = 0;
+      var publisherRiders = 0;
+      try {
+        final raw = await _client.rpc('admin_publisher_stats');
+        final map = Map<String, dynamic>.from(raw as Map);
+        publisherTotal = _asInt(map['accounts_total']);
+        publisherDrivers = _asInt(map['accounts_drivers']);
+        publisherRiders = _asInt(map['accounts_riders']);
+      } catch (_) {
+        // RPC may not exist until migrate_publisher_stats.sql is applied.
+      }
+      var phoneInstalls = 0;
+      var desktopInstalls = 0;
+      var totalInstalls = 0;
+      try {
+        final raw = await _client.rpc('admin_app_install_stats');
+        final map = Map<String, dynamic>.from(raw as Map);
+        phoneInstalls = _asInt(map['phone_installs']);
+        desktopInstalls = _asInt(map['desktop_installs']);
+        totalInstalls = _asInt(map['total_installs']);
+      } catch (_) {
+        // RPC may not exist until migrate_app_installs.sql is applied.
+      }
+      final placesTotal = await _countAdminPlaces();
       return AdminStats(
-        listingsTotal: await listings.countAll(),
+        listingsTotal: await listings.countLiveDirectory(),
         drivers: await listings.countDrivers(),
         riders: await listings.countRiders(),
         reportsOpen: open,
         reportsTotal: reports.length,
         outreachFresh: fresh,
         outreachTotal: total,
+        publisherAccountsTotal: publisherTotal,
+        publisherAccountsDrivers: publisherDrivers,
+        publisherAccountsRiders: publisherRiders,
+        phoneInstalls: phoneInstalls,
+        desktopInstalls: desktopInstalls,
+        totalInstalls: totalInstalls,
+        placesTotal: placesTotal,
       );
     }
     await Future<void>.delayed(const Duration(milliseconds: 30));
@@ -250,14 +283,39 @@ class AdminRepository {
     final fresh =
         _localLeads.where((l) => l.status == OutreachLeadStatus.fresh).length;
     return AdminStats(
-      listingsTotal: listings.totalCount,
+      listingsTotal: await listings.countLiveDirectory(),
       drivers: listings.driverCount,
       riders: listings.riderCount,
       reportsOpen: open,
       reportsTotal: _reports.length,
       outreachFresh: fresh,
       outreachTotal: _localLeads.length,
+      placesTotal: await _countAdminPlaces(),
     );
+  }
+
+  Future<int> _countAdminPlaces() async {
+    try {
+      await PlacesCatalog.shared.refresh(forAdmin: true);
+      final catalog = PlacesCatalog.shared;
+      final keys = <String>{};
+      for (final name in catalog.builtinNames) {
+        final k = name.trim().toLowerCase();
+        if (k.isNotEmpty) keys.add(k);
+      }
+      for (final p in catalog.managed) {
+        final k = p.name.trim().toLowerCase();
+        if (k.isNotEmpty) keys.add(k);
+      }
+      return keys.length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  static int _asInt(dynamic value) {
+    if (value is int) return value;
+    return int.tryParse('$value') ?? 0;
   }
 
   // —— Outreach invites ——

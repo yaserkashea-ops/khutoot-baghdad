@@ -6,6 +6,7 @@
   static bool get isAdminEntry => false;
 
   static Stream<void> get onStateChanged => const Stream.empty();
+  static Stream<String> get onInstallOutcome => const Stream.empty();
 
   static void setMode(String mode) {}
 
@@ -13,9 +14,19 @@
 
   static bool openAdminEntry() => false;
 
+  static void showNativeInstallButton({
+    required String label,
+    double bottomPx = 88,
+  }) {}
+
+  static void hideNativeInstallButton() {}
+
   static Future<bool> waitForPrompt({
     Duration timeout = const Duration(milliseconds: 2500),
-  }) async => false;
+  }) async =>
+      false;
 
   static Future<String> promptInstall() async => 'unavailable';
+
+  static Future<void> recordInstallInBrowser({String source = 'app'}) async {}
 }

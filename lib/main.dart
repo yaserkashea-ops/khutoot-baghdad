@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -5,9 +7,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'admin_app.dart';
 import 'app.dart';
 import 'core/auth/admin_auth_controller.dart';
+import 'core/auth/publisher_auth_controller.dart';
 import 'core/bootstrap/app_bootstrap.dart';
+import 'core/config/admin_contact.dart';
 import 'core/config/app_hosts.dart';
 import 'core/config/supabase_config.dart';
+import 'core/data/places_catalog.dart';
 import 'core/theme/theme_controller.dart';
 import 'data/admin_repository.dart';
 import 'data/listings_repository.dart';
@@ -30,6 +35,7 @@ Future<void> main() async {
     await Future.wait<void>([
       ThemeController.shared.load(),
       _initSupabase(),
+      if (!isAdmin) PublisherAuthController.shared.load(),
     ]).timeout(const Duration(seconds: 8));
     if (isAdmin) {
       await AdminAuthController.shared
@@ -41,6 +47,10 @@ Future<void> main() async {
   } finally {
     AppBootstrap.markReady();
   }
+
+  // Background only — never block first paint.
+  unawaited(PlacesCatalog.shared.refresh());
+  unawaited(AdminContact.shared.refresh());
 }
 
 Future<void> _initSupabase() async {

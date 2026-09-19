@@ -1,4 +1,6 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/auth/admin_auth_controller.dart';
 import '../../../core/config/admin_contact.dart';
@@ -15,14 +17,39 @@ class AdminSettingsPage extends StatefulWidget {
 class _AdminSettingsPageState extends State<AdminSettingsPage> {
   final _password = TextEditingController();
   final _password2 = TextEditingController();
+  final _whatsapp = TextEditingController();
+  final _telegram = TextEditingController();
   bool _obscure = true;
-  bool _saving = false;
+  bool _savingPassword = false;
+  bool _savingContact = false;
+  bool _loadingContact = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _whatsapp.text = AdminContact.shared.whatsappPhoneValue;
+    _telegram.text = AdminContact.shared.telegramValue;
+    _loadContact();
+  }
 
   @override
   void dispose() {
     _password.dispose();
     _password2.dispose();
+    _whatsapp.dispose();
+    _telegram.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadContact() async {
+    setState(() => _loadingContact = true);
+    await AdminContact.shared.refresh();
+    if (!mounted) return;
+    setState(() {
+      _whatsapp.text = AdminContact.shared.whatsappPhoneValue;
+      _telegram.text = AdminContact.shared.telegramValue;
+      _loadingContact = false;
+    });
   }
 
   Future<void> _savePassword() async {
@@ -30,7 +57,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
       _toast('تأكيد كلمة المرور غير متطابق');
       return;
     }
-    setState(() => _saving = true);
+    setState(() => _savingPassword = true);
     try {
       await AdminAuthController.shared.updatePassword(_password.text);
       if (!mounted) return;
@@ -41,8 +68,43 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
       if (!mounted) return;
       _toast(e is ArgumentError ? e.message.toString() : 'تعذر الحفظ');
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) setState(() => _savingPassword = false);
     }
+  }
+
+  Future<void> _saveContact() async {
+    setState(() => _savingContact = true);
+    try {
+      await AdminContact.shared.save(
+        whatsappPhone: _whatsapp.text,
+        telegram: _telegram.text,
+      );
+      if (!mounted) return;
+      _toast('تم حفظ وسائل التواصل', ok: true);
+    } catch (e) {
+      if (!mounted) return;
+      final msg = '$e';
+      if (msg.contains('واتساب') || msg.contains('تلغرام')) {
+        _toast(e is ArgumentError ? e.message.toString() : msg);
+      } else if (msg.contains('PGRST') || msg.contains('404')) {
+        _toast('نفّذ migrate_app_settings.sql في Supabase أولاً');
+      } else {
+        _toast(e is ArgumentError ? e.message.toString() : 'تعذر الحفظ');
+      }
+    } finally {
+      if (mounted) setState(() => _savingContact = false);
+    }
+  }
+
+  Future<void> _copy(String label, String value) async {
+    final text = value.trim();
+    if (text.isEmpty) {
+      _toast('لا يوجد نص للنسخ');
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    _toast('تم نسخ $label', ok: true);
   }
 
   void _toast(String message, {bool ok = false}) {
@@ -51,7 +113,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
       SnackBar(
         behavior: SnackBarBehavior.floating,
         backgroundColor: ok ? c.primary : null,
-        content: Text(message),
+        content: Text(message, style: GoogleFonts.ibmPlexSansArabic()),
       ),
     );
   }
@@ -75,7 +137,11 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
           ),
         ),
         const SizedBox(height: 12),
-        _InfoTile(title: 'البريد الحالي', value: email.isEmpty ? '—' : email),
+        _CopyableField(
+          label: 'البريد الحالي',
+          value: email.isEmpty ? '—' : email,
+          onCopy: email.isEmpty ? null : () => _copy('البريد', email),
+        ),
         const SizedBox(height: 16),
         TextField(
           controller: _password,
@@ -102,22 +168,94 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: FilledButton(
-            onPressed: _saving ? null : _savePassword,
-            child: Text(_saving ? 'جاري الحفظ…' : 'حفظ كلمة المرور'),
+            onPressed: _savingPassword ? null : _savePassword,
+            child: Text(_savingPassword ? 'جاري الحفظ…' : 'حفظ كلمة المرور'),
           ),
         ),
         const SizedBox(height: 28),
-        Text('التواصل مع الإدارة', style: theme.textTheme.titleMedium),
-        const SizedBox(height: 8),
-        _InfoTile(title: 'واتساب', value: AdminContact.whatsappPhone),
-        const SizedBox(height: 8),
-        _InfoTile(title: 'تلغرام', value: AdminContact.telegram),
+        Row(
+          children: [
+            Text('التواصل مع الإدارة', style: theme.textTheme.titleMedium),
+            const Spacer(),
+            if (_loadingContact)
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: c.primary,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'عدّل الرقم والرابط هنا — يظهران مباشرة في نموذج تواصل المستخدمين.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: c.text.withValues(alpha: 0.55),
+            height: 1.45,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _whatsapp,
+          keyboardType: TextInputType.phone,
+          decoration: InputDecoration(
+            labelText: 'واتساب (مع رمز الدولة)',
+            hintText: '9647XXXXXXXXX',
+            border: const OutlineInputBorder(),
+            filled: true,
+            fillColor: c.surface,
+            suffixIcon: IconButton(
+              tooltip: 'نسخ',
+              onPressed: () => _copy('واتساب', _whatsapp.text),
+              icon: const Icon(Icons.copy_outlined, size: 18),
+            ),
+          ),
+          style: GoogleFonts.ibmPlexSansArabic(),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _telegram,
+          keyboardType: TextInputType.url,
+          decoration: InputDecoration(
+            labelText: 'تلغرام (رابط أو يوزر)',
+            hintText: 'https://t.me/username',
+            border: const OutlineInputBorder(),
+            filled: true,
+            fillColor: c.surface,
+            suffixIcon: IconButton(
+              tooltip: 'نسخ',
+              onPressed: () => _copy('تلغرام', _telegram.text),
+              icon: const Icon(Icons.copy_outlined, size: 18),
+            ),
+          ),
+          style: GoogleFonts.ibmPlexSansArabic(),
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: FilledButton(
+            onPressed: _savingContact ? null : _saveContact,
+            child: Text(
+              _savingContact ? 'جاري الحفظ…' : 'حفظ وسائل التواصل',
+            ),
+          ),
+        ),
         const SizedBox(height: 28),
         Text('الروابط', style: theme.textTheme.titleMedium),
         const SizedBox(height: 8),
-        _InfoTile(title: 'الأداة العامة', value: AppHosts.publicUrl),
+        _CopyableField(
+          label: 'الأداة العامة',
+          value: AppHosts.publicUrl,
+          onCopy: () => _copy('رابط الأداة', AppHosts.publicUrl),
+        ),
         const SizedBox(height: 8),
-        _InfoTile(title: 'لوحة التحكم', value: AppHosts.adminUrl),
+        _CopyableField(
+          label: 'لوحة التحكم',
+          value: AppHosts.adminUrl,
+          onCopy: () => _copy('رابط لوحة التحكم', AppHosts.adminUrl),
+        ),
         const SizedBox(height: 8),
         Text(
           'نسخة التطبيق ${AppHosts.buildLabel}',
@@ -130,11 +268,16 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
   }
 }
 
-class _InfoTile extends StatelessWidget {
-  const _InfoTile({required this.title, required this.value});
+class _CopyableField extends StatelessWidget {
+  const _CopyableField({
+    required this.label,
+    required this.value,
+    this.onCopy,
+  });
 
-  final String title;
+  final String label;
   final String value;
+  final VoidCallback? onCopy;
 
   @override
   Widget build(BuildContext context) {
@@ -142,25 +285,49 @@ class _InfoTile extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
       decoration: BoxDecoration(
         color: c.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: c.border.withValues(alpha: 0.9)),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: c.text.withValues(alpha: 0.5),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: c.text.withValues(alpha: 0.5),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                SelectableText(
+                  value,
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontSize: 14,
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(value, style: theme.textTheme.bodyMedium),
+          if (onCopy != null)
+            IconButton(
+              tooltip: 'نسخ',
+              onPressed: onCopy,
+              icon: Icon(
+                Icons.copy_outlined,
+                size: 18,
+                color: c.text.withValues(alpha: 0.55),
+              ),
+            ),
         ],
       ),
     );
   }
 }
+

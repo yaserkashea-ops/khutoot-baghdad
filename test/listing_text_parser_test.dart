@@ -20,7 +20,7 @@ void main() {
     expect(l.contactTelegram, '@r_yzx1');
     expect(l.vehicleType, 'خصوصي حديث');
     expect(l.destination, anyOf('مجمع الجادرية', 'جامعة بغداد — الجادرية', 'الجادرية'));
-    expect(l.area, anyOf('حي الجامعة', 'الجامعة'));
+    expect(l.area, 'حي الجامعة');
   });
 
   test('طلبة وموظفي + حي الجهاد (فروع)', () {
@@ -141,6 +141,6 @@ void main() {
     expect(l.contactTelegram, '@OT2022');
     expect(l.seatsCount, 7);
     expect(l.destination, anyOf('مجمع الجادرية', 'جامعة بغداد — الجادرية', 'الجادرية', 'جامعة بغداد'));
-    expect(l.area, anyOf('حي الخضراء', 'الخضراء', 'حي الخضراء (المنطقة الخضراء)'));
+    expect(l.area, 'حي الخضراء');
   });
 }

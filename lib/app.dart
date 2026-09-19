@@ -11,13 +11,18 @@ import 'features/listings/listings_page.dart';
 class MasaratApp extends StatelessWidget {
   const MasaratApp({super.key});
 
+  /// Keeps the navigator alive across theme updates.
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: ThemeController.shared,
       builder: (context, _) {
         return MaterialApp(
-          title: 'خطوط بغداد',
+          navigatorKey: navigatorKey,
+          title: 'دليل خطوط بغداد',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,

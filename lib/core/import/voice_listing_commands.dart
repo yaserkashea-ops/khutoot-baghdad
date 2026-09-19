@@ -1,3 +1,4 @@
+import '../data/baghdad_places.dart';
 import '../models/listing.dart';
 import '../utils/phone_digits.dart';
 import '../utils/place_text_rules.dart';
@@ -332,9 +333,17 @@ abstract final class VoiceListingCommands {
       RegExp(r'^(?:المنطقه|الوجهه|منطقه|وجهه|من|الي|الى)\s+'),
       '',
     );
+    final listed = PlaceTextRules.resolveListed(
+      t,
+      [
+        ...BaghdadPlaces.areasWith(const []),
+        ...BaghdadPlaces.destinationsWith(const []),
+      ],
+    );
+    if (listed != null) return VoiceStepResult.ok(listed);
     if (t.length < 2 || t.length > PlaceTextRules.maxLength) {
       return VoiceStepResult.fail(
-        'قل $label بشكل أوضح (٢–${PlaceTextRules.maxLength} حرفاً)',
+        'قل $label بشكل أوضح (٢–${PlaceTextRules.maxLength} حرفاً)، أو اسم منطقة من القائمة',
       );
     }
     if (RegExp(r'https?:|www\.|t\.me').hasMatch(t)) {

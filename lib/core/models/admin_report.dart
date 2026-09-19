@@ -119,6 +119,13 @@ class AdminStats {
     required this.reportsTotal,
     this.outreachFresh = 0,
     this.outreachTotal = 0,
+    this.publisherAccountsTotal = 0,
+    this.publisherAccountsDrivers = 0,
+    this.publisherAccountsRiders = 0,
+    this.phoneInstalls = 0,
+    this.desktopInstalls = 0,
+    this.totalInstalls = 0,
+    this.placesTotal = 0,
   });
 
   final int listingsTotal;
@@ -128,4 +135,11 @@ class AdminStats {
   final int reportsTotal;
   final int outreachFresh;
   final int outreachTotal;
+  final int publisherAccountsTotal;
+  final int publisherAccountsDrivers;
+  final int publisherAccountsRiders;
+  final int phoneInstalls;
+  final int desktopInstalls;
+  final int totalInstalls;
+  final int placesTotal;
 }

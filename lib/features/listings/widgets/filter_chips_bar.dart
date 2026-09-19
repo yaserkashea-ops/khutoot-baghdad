@@ -1,16 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/config/admin_contact.dart';
 import '../../../core/data/baghdad_places.dart';
+import '../../../core/data/places_catalog.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/place_text_rules.dart';
+import '../../support/contact_admin_sheet.dart';
 import 'place_options_menu.dart';
 
 /// Mobile-first search panel for transit listings.
 class FilterChipsBar extends StatelessWidget {
   const FilterChipsBar({
     super.key,
-    required this.areas,
-    required this.destinations,
     required this.timeSlots,
     required this.areaQuery,
     required this.destinationQuery,
@@ -24,12 +28,10 @@ class FilterChipsBar extends StatelessWidget {
     required this.onGenderChanged,
     required this.onDepartureQueryChanged,
     required this.onReturnQueryChanged,
-    this.onAreaCommitted,
-    this.onDestinationCommitted,
+    this.extraAreaOptions = const [],
+    this.extraDestinationOptions = const [],
   });
 
-  final List<String> areas;
-  final List<String> destinations;
   final List<String> timeSlots;
   final String areaQuery;
   final String destinationQuery;
@@ -43,8 +45,10 @@ class FilterChipsBar extends StatelessWidget {
   final ValueChanged<String?> onGenderChanged;
   final ValueChanged<String> onDepartureQueryChanged;
   final ValueChanged<String> onReturnQueryChanged;
-  final ValueChanged<String>? onAreaCommitted;
-  final ValueChanged<String>? onDestinationCommitted;
+
+  /// Sub-places (and listing mains) merged into the from/to search lists.
+  final List<String> extraAreaOptions;
+  final List<String> extraDestinationOptions;
 
   static const genderOptions = <(String key, String label)>[
     ('female_only', 'بنات'),
@@ -176,14 +180,23 @@ class FilterChipsBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
-    final theme = Theme.of(context);
-    final areaOptions = BaghdadPlaces.areasWith(areas);
-    final destinationOptions = BaghdadPlaces.destinationsWith(destinations);
-    final genderHint = _genderLabel;
-    final extraActive = _hasExtraFilters;
+    return ListenableBuilder(
+      listenable: PlacesCatalog.shared,
+      builder: (context, _) {
+        final c = context.colors;
+        final theme = Theme.of(context);
+        final areaOptions = BaghdadPlaces.prioritize({
+          ...PlacesCatalog.shared.areas,
+          ...extraAreaOptions,
+        });
+        final destinationOptions = BaghdadPlaces.prioritize({
+          ...PlacesCatalog.shared.destinations,
+          ...extraDestinationOptions,
+        });
+        final genderHint = _genderLabel;
+        final extraActive = _hasExtraFilters;
 
-    return Column(
+        return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
@@ -205,21 +218,19 @@ class FilterChipsBar extends StatelessWidget {
         _DropdownSearchField(
           label: 'من أين؟',
           value: areaQuery,
-          hint: 'اكتب أي منطقة أو اختر من القائمة',
+          hint: 'اكتب او اختر من القائمة',
           options: areaOptions,
           addMissingLabel: BaghdadPlaces.addMissingArea,
           onChanged: onAreaQueryChanged,
-          onCommitted: onAreaCommitted,
         ),
         const SizedBox(height: 10),
         _DropdownSearchField(
           label: 'إلى أين؟',
           value: destinationQuery,
-          hint: 'اكتب أي وجهة أو اختر من القائمة',
+          hint: 'اكتب او اختر من القائمة',
           options: destinationOptions,
           addMissingLabel: BaghdadPlaces.addMissingDestination,
           onChanged: onDestinationQueryChanged,
-          onCommitted: onDestinationCommitted,
         ),
         const SizedBox(height: 12),
         Text(
@@ -270,6 +281,8 @@ class FilterChipsBar extends StatelessWidget {
           ),
         ),
       ],
+    );
+      },
     );
   }
 }
@@ -395,7 +408,7 @@ class _DropdownSearchField extends StatefulWidget {
     required this.options,
     required this.onChanged,
     required this.addMissingLabel,
-    this.onCommitted,
+    this.requiredField = false,
   });
 
   final String label;
@@ -404,7 +417,7 @@ class _DropdownSearchField extends StatefulWidget {
   final List<String> options;
   final ValueChanged<String> onChanged;
   final String addMissingLabel;
-  final ValueChanged<String>? onCommitted;
+  final bool requiredField;
 
   @override
   State<_DropdownSearchField> createState() => _DropdownSearchFieldState();
@@ -418,20 +431,29 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
   late final PlaceOptionsMenuController _menu;
   final Object _tapGroup = Object();
   double _fieldWidth = 280;
+  bool _applyingSuggestion = false;
+  /// Last value accepted into the filter (listed only, or empty).
+  String _committed = '';
+  String? _typedBeforeArm;
 
   @override
   void initState() {
     super.initState();
+    _committed = widget.value.trim();
     _controller = TextEditingController(text: widget.value);
     _focusNode = FocusNode();
     _menu = PlaceOptionsMenuController();
     _controller.addListener(_onTextChanged);
+    _focusNode.addListener(_onFocusChange);
   }
 
   @override
   void didUpdateWidget(covariant _DropdownSearchField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.value != _controller.text) {
+    if (widget.value != _committed) {
+      _committed = widget.value.trim();
+    }
+    if (widget.value != _controller.text && !_focusNode.hasFocus) {
       _controller.text = widget.value;
       _controller.selection =
           TextSelection.collapsed(offset: _controller.text.length);
@@ -441,18 +463,50 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
   @override
   void dispose() {
     _controller.removeListener(_onTextChanged);
+    _focusNode.removeListener(_onFocusChange);
     _menu.dispose();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
+  void _onFocusChange() {
+    if (!_focusNode.hasFocus) {
+      if (_applyingSuggestion || _menu.isOpen) return;
+      _finalizeListedOrReject();
+    }
+  }
+
   void _onTextChanged() {
-    widget.onChanged(_controller.text);
+    if (_applyingSuggestion) return;
+    // Typing only drives suggestions — never pushes free text into the filter.
+    if (mounted) setState(() {});
     _syncSuggestionsWhileTyping();
   }
 
+  void _armSelect(String value) {
+    _applyingSuggestion = true;
+    _typedBeforeArm ??= _controller.text;
+    _controller.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+  }
+
+  void _cancelArm() {
+    final restore = _typedBeforeArm;
+    _typedBeforeArm = null;
+    if (restore != null) {
+      _controller.value = TextEditingValue(
+        text: restore,
+        selection: TextSelection.collapsed(offset: restore.length),
+      );
+    }
+    _applyingSuggestion = false;
+  }
+
   void _syncSuggestionsWhileTyping() {
+    if (_applyingSuggestion) return;
     if (!_focusNode.hasFocus) return;
     final q = _controller.text.trim();
     if (q.isEmpty) {
@@ -468,8 +522,11 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
       width: _fieldWidth,
       optionsOf: () => widget.options,
       queryOf: () => _controller.text,
-      leadingOption: _clearOption,
+      leadingOption: widget.requiredField ? null : _clearOption,
+      trailingOption: widget.addMissingLabel,
       onSelected: _onOptionSelected,
+      onArmSelect: _armSelect,
+      onCancelArm: _cancelArm,
       tapRegionGroupId: _tapGroup,
       keepFocus: true,
       showAll: false,
@@ -491,8 +548,11 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
       width: _fieldWidth,
       optionsOf: () => widget.options,
       queryOf: () => _controller.text,
-      leadingOption: _clearOption,
+      leadingOption: widget.requiredField ? null : _clearOption,
+      trailingOption: widget.addMissingLabel,
       onSelected: _onOptionSelected,
+      onArmSelect: _armSelect,
+      onCancelArm: _cancelArm,
       tapRegionGroupId: _tapGroup,
       keepFocus: false,
       onChanged: () {
@@ -501,28 +561,144 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
     );
   }
 
-  void _onOptionSelected(String selection) {
-    if (selection == _clearOption) {
-      _controller.clear();
-      widget.onChanged('');
-      setState(() {});
-      return;
-    }
-    _commitTyped(selection);
+  Future<void> _openAddPlaceRequest(String typed) async {
+    final isDestination =
+        widget.addMissingLabel == BaghdadPlaces.addMissingDestination;
+    final placeHint = typed.isEmpty ? '……' : typed;
+    final message = isDestination
+        ? 'أرغب بإضافة الوجهة التالية إلى الفلتر: $placeHint'
+        : 'أرغب بإضافة المنطقة التالية إلى الفلتر: $placeHint';
+    if (!mounted) return;
+    await showContactAdminSheet(
+      context,
+      initialKind: AdminContactKind.problem,
+      initialMessage: message,
+    );
   }
 
-  void _commitTyped([String? raw]) {
-    final text = (raw ?? _controller.text).trim();
+  void _setFieldText(String text) {
+    _applyingSuggestion = true;
+    _controller.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    _applyingSuggestion = false;
+  }
+
+  void _applyListed(String listed) {
+    _applyingSuggestion = true;
+    _typedBeforeArm = null;
+    _committed = listed;
+    _controller.value = TextEditingValue(
+      text: listed,
+      selection: TextSelection.collapsed(offset: listed.length),
+    );
     _closeMenu();
-    if (_controller.text != text) {
-      _controller.text = text;
-      _controller.selection = TextSelection.collapsed(offset: text.length);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _controller.value = TextEditingValue(
+        text: listed,
+        selection: TextSelection.collapsed(offset: listed.length),
+      );
+      _applyingSuggestion = false;
+      _focusNode.unfocus();
+      widget.onChanged(listed);
+      if (mounted) setState(() {});
+    });
+  }
+
+  void _clearFilter() {
+    if (widget.requiredField && _committed.isNotEmpty) {
+      // Required main fields cannot be left empty once set — pick another place instead.
+      _setFieldText(_committed);
+      _closeMenu();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text(
+              'لا يمكن ترك هذا الحقل فارغاً — اختر منطقة من القائمة',
+              style: GoogleFonts.ibmPlexSansArabic(),
+            ),
+          ),
+        );
+      }
+      return;
     }
-    widget.onChanged(text);
-    if (text.isNotEmpty) {
-      widget.onCommitted?.call(text);
-    }
+    _committed = '';
+    _setFieldText('');
+    _closeMenu();
     _focusNode.unfocus();
+    widget.onChanged('');
+    if (mounted) setState(() {});
+  }
+
+  /// Accept only a catalog place; otherwise revert and offer admin contact.
+  void _finalizeListedOrReject() {
+    final raw = _controller.text.trim();
+    if (raw.isEmpty) {
+      if (widget.requiredField) {
+        _setFieldText(_committed);
+        _closeMenu();
+        if (_committed.isEmpty && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              content: Text(
+                'هذا الحقل مطلوب',
+                style: GoogleFonts.ibmPlexSansArabic(),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+      if (_committed.isNotEmpty) {
+        _clearFilter();
+      } else {
+        _closeMenu();
+      }
+      return;
+    }
+    if (raw == widget.addMissingLabel) {
+      _setFieldText(_committed);
+      _closeMenu();
+      return;
+    }
+    final listed = PlaceTextRules.resolveListed(raw, widget.options);
+    if (listed != null) {
+      if (listed != _committed || _controller.text != listed) {
+        _applyListed(listed);
+      } else {
+        _closeMenu();
+      }
+      return;
+    }
+    // Free text / unknown place — do not filter with it.
+    final typed = raw;
+    _setFieldText(_committed);
+    _closeMenu();
+    if (mounted) setState(() {});
+    unawaited(_openAddPlaceRequest(typed));
+  }
+
+  void _onOptionSelected(String selection) {
+    if (selection == _clearOption) {
+      if (widget.requiredField) return;
+      _clearFilter();
+      return;
+    }
+    if (selection == widget.addMissingLabel) {
+      final typed = _controller.text.trim();
+      _setFieldText(_committed);
+      _closeMenu();
+      _focusNode.unfocus();
+      unawaited(_openAddPlaceRequest(typed));
+      return;
+    }
+    final listed = PlaceTextRules.resolveListed(selection, widget.options);
+    if (listed == null) return;
+    _applyListed(listed);
   }
 
   @override
@@ -554,7 +730,12 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
             return TapRegion(
               groupId: _tapGroup,
               onTapOutside: (_) {
-                if (_menu.isOpen) _closeMenu();
+                if (_menu.isOpen) {
+                  _closeMenu();
+                  _applyingSuggestion = false;
+                  _typedBeforeArm = null;
+                  _finalizeListedOrReject();
+                }
               },
               child: KeyedSubtree(
                 key: _menu.targetKey,
@@ -563,7 +744,7 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
                   focusNode: _focusNode,
                   style: textStyle,
                   textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _commitTyped(),
+                  onSubmitted: (_) => _finalizeListedOrReject(),
                   decoration: InputDecoration(
                     hintText: widget.hint,
                     hintStyle: GoogleFonts.ibmPlexSansArabic(
@@ -582,7 +763,7 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
                     suffixIcon: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (_controller.text.isNotEmpty)
+                        if (_controller.text.isNotEmpty && !widget.requiredField)
                           IconButton(
                             tooltip: 'مسح',
                             style: IconButton.styleFrom(
@@ -593,11 +774,7 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
                               size: 18,
                               color: c.text.withValues(alpha: 0.45),
                             ),
-                            onPressed: () {
-                              _controller.clear();
-                              widget.onChanged('');
-                              _closeMenu();
-                            },
+                            onPressed: _clearFilter,
                           ),
                         IconButton(
                           tooltip: menuOpen ? 'إغلاق' : 'القائمة',

@@ -33,12 +33,12 @@ class EmptyListingsState extends StatelessWidget {
     final (title, body, IconData icon) = switch (kind) {
       EmptyListingsKind.promptSearch => (
           'ابدأ البحث',
-          'اختر المنطقة والوجهة لعرض الخطوط',
+          'اختر المنطقة والوجهة لتصفية الخطوط، أو تصفح الكل',
           Icons.search_rounded,
         ),
       EmptyListingsKind.noMatch => (
           'لم نجد خطوطاً مطابقة',
-          'جرّب توسيع الفلاتر أو انشر طلبك ليراك الآخرون',
+          'جرّب توسيع الفلاتر، أو إن كنت سائقاً أضف خطك إلى الدليل',
           Icons.route_outlined,
         ),
       EmptyListingsKind.error => (
@@ -86,7 +86,7 @@ class EmptyListingsState extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(180, 46),
               ),
-              child: const Text('انشر طلباً'),
+              child: const Text('أضف خطك'),
             ),
         ],
       ),

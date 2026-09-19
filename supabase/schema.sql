@@ -19,6 +19,9 @@ create table if not exists listings (
   gender_requirement text check (gender_requirement in ('male_only','female_only','mixed')) not null,
   contact_phone text,
   contact_telegram text,
+  owner_account_id uuid,
+  view_count int not null default 0,
+  bumped_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -302,3 +305,6 @@ create policy outreach_leads_admin_delete on outreach_leads
   for delete to authenticated using (true);
 
 grant select, insert, update, delete on outreach_leads to authenticated;
+
+-- —— حسابات الناشرين (بدون OTP) ——
+-- طبّق أيضاً: migrate_publisher_accounts.sql على قاعدة موجودة.

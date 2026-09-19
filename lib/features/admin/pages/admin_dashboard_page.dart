@@ -63,41 +63,33 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             runSpacing: 12,
             children: [
               _StatCard(
-                title: 'كل الإعلانات',
+                title: 'الإعلانات',
                 value: '${s.listingsTotal}',
-                onTap: () => widget.onOpenTab(1),
+                onTap: () => widget.onOpenTab(3),
               ),
               _StatCard(
-                title: 'سائق لديه خط',
-                value: '${s.drivers}',
-                accent: c.accent,
-                onTap: () => widget.onOpenTab(1),
+                title: 'المناطق',
+                value: '${s.placesTotal}',
+                onTap: () => widget.onOpenTab(9),
               ),
               _StatCard(
-                title: 'يبحث عن خط',
-                value: '${s.riders}',
-                accent: c.riderAccent,
-                onTap: () => widget.onOpenTab(1),
+                title: 'حسابات منشورة',
+                value: '${s.publisherAccountsTotal}',
+                onTap: () => widget.onOpenTab(3),
               ),
               _StatCard(
-                title: 'بلاغات مفتوحة',
-                value: '${s.reportsOpen}',
-                onTap: () => widget.onOpenTab(6),
+                title: 'تثبيتات الهاتف',
+                value: '${s.phoneInstalls}',
               ),
               _StatCard(
-                title: 'كل البلاغات',
+                title: 'البلاغات',
                 value: '${s.reportsTotal}',
-                onTap: () => widget.onOpenTab(6),
+                onTap: () => widget.onOpenTab(8),
               ),
               _StatCard(
-                title: 'دعوات جديدة',
-                value: '${s.outreachFresh}',
-                onTap: () => widget.onOpenTab(5),
-              ),
-              _StatCard(
-                title: 'كل الدعوات',
+                title: 'دعوات',
                 value: '${s.outreachTotal}',
-                onTap: () => widget.onOpenTab(5),
+                onTap: () => widget.onOpenTab(7),
               ),
             ],
           ),
@@ -111,59 +103,80 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
           const SizedBox(height: 10),
           _ShortcutTile(
+            title: 'طلبات الدليل',
+            subtitle: 'مراجعة، انتظار الدفع، نشر أو رفض',
+            icon: Icons.inbox_outlined,
+            onTap: () => widget.onOpenTab(1),
+          ),
+          const SizedBox(height: 8),
+          _ShortcutTile(
+            title: 'الاشتراكات',
+            subtitle: 'صلاحية 30 يوماً — تجديد، إخفاء، حذف، واتساب',
+            icon: Icons.event_available_outlined,
+            onTap: () => widget.onOpenTab(2),
+          ),
+          const SizedBox(height: 8),
+          _ShortcutTile(
             title: 'إدارة الإعلانات',
             subtitle: 'عرض، بحث، حذف المنشورات',
             icon: Icons.list_alt,
-            onTap: () => widget.onOpenTab(1),
+            onTap: () => widget.onOpenTab(3),
           ),
           const SizedBox(height: 8),
           _ShortcutTile(
             title: 'جهات المنشورات',
             subtitle: 'أرقام ويوزرات المنشورة حسب نوع الإعلان',
             icon: Icons.contacts_outlined,
-            onTap: () => widget.onOpenTab(2),
+            onTap: () => widget.onOpenTab(4),
           ),
           const SizedBox(height: 8),
           _ShortcutTile(
             title: 'المنشورات المكررة',
             subtitle: 'نفس واتساب أو معرف التلغرام',
             icon: Icons.copy_all_outlined,
-            onTap: () => widget.onOpenTab(3),
+            onTap: () => widget.onOpenTab(5),
           ),
           const SizedBox(height: 8),
           _ShortcutTile(
             title: 'استيراد من تلغرام / SMS',
             subtitle: 'لصق منشورات أو أوامر صوتية ثم النشر',
             icon: Icons.upload_file_outlined,
-            onTap: () => widget.onOpenTab(4),
+            onTap: () => widget.onOpenTab(6),
           ),
           const SizedBox(height: 8),
           _ShortcutTile(
             title: 'أوامر صوتية لإضافة خط',
             subtitle: 'خطوة بخطوة أو جملة واحدة — من تبويب الاستيراد',
             icon: Icons.mic,
-            onTap: () => widget.onOpenTab(4),
+            onTap: () => widget.onOpenTab(6),
           ),
           const SizedBox(height: 8),
           _ShortcutTile(
             title: 'دعوات التطبيق',
             subtitle: 'استخراج أرقام ويوزرات ودعوة يدوية',
             icon: Icons.campaign_outlined,
-            onTap: () => widget.onOpenTab(5),
+            onTap: () => widget.onOpenTab(7),
           ),
           const SizedBox(height: 8),
           _ShortcutTile(
             title: 'متابعة البلاغات',
             subtitle: 'بلاغ / شكوى / مشكلة',
             icon: Icons.flag_outlined,
-            onTap: () => widget.onOpenTab(6),
+            onTap: () => widget.onOpenTab(8),
+          ),
+          const SizedBox(height: 8),
+          _ShortcutTile(
+            title: 'مناطق الفلاتر',
+            subtitle: 'إضافة مناطق جديدة للقوائم دون تحديث التطبيق',
+            icon: Icons.place_outlined,
+            onTap: () => widget.onOpenTab(9),
           ),
           const SizedBox(height: 8),
           _ShortcutTile(
             title: 'إعدادات التواصل',
             subtitle: 'مراجعة قنوات الإدارة',
             icon: Icons.settings_outlined,
-            onTap: () => widget.onOpenTab(7),
+            onTap: () => widget.onOpenTab(10),
           ),
         ],
       ),
@@ -175,19 +188,17 @@ class _StatCard extends StatelessWidget {
   const _StatCard({
     required this.title,
     required this.value,
-    required this.onTap,
-    this.accent,
+    this.onTap,
   });
 
   final String title;
   final String value;
-  final VoidCallback onTap;
-  final Color? accent;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final stripe = accent ?? c.primary;
+    final stripe = c.primary;
     return SizedBox(
       width: 150,
       child: Material(

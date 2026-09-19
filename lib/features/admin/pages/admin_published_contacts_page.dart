@@ -53,7 +53,7 @@ class _AdminPublishedContactsPageState
   String? _error;
   List<_ContactEntry> _phones = const [];
   List<_ContactEntry> _telegrams = const [];
-  _TypeFilter _typeFilter = _TypeFilter.all;
+  final _TypeFilter _typeFilter = _TypeFilter.all;
 
   @override
   void initState() {
@@ -159,11 +159,6 @@ class _AdminPublishedContactsPageState
     final telegrams = _filter(_telegrams);
     final phoneUnique = phones.length;
     final tgUnique = telegrams.length;
-    final driverPhones =
-        _phones.where((e) => e.driverCount > 0).length;
-    final riderPhones = _phones.where((e) => e.riderCount > 0).length;
-    final driverTg = _telegrams.where((e) => e.driverCount > 0).length;
-    final riderTg = _telegrams.where((e) => e.riderCount > 0).length;
 
     return RefreshIndicator(
       color: c.primary,
@@ -204,48 +199,6 @@ class _AdminPublishedContactsPageState
                 label: 'يوزرات فريدة',
                 value: '${_telegrams.length}',
                 accent: c.accent,
-              ),
-              _SoftStat(
-                label: 'أرقام سائق',
-                value: '$driverPhones',
-                accent: c.accent,
-              ),
-              _SoftStat(
-                label: 'أرقام باحث',
-                value: '$riderPhones',
-                accent: c.riderAccent,
-              ),
-              _SoftStat(
-                label: 'يوزر سائق',
-                value: '$driverTg',
-                accent: c.accent,
-              ),
-              _SoftStat(
-                label: 'يوزر باحث',
-                value: '$riderTg',
-                accent: c.riderAccent,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              _Chip(
-                label: 'الكل',
-                selected: _typeFilter == _TypeFilter.all,
-                onTap: () => setState(() => _typeFilter = _TypeFilter.all),
-              ),
-              _Chip(
-                label: 'سائق لديه خط',
-                selected: _typeFilter == _TypeFilter.driver,
-                onTap: () => setState(() => _typeFilter = _TypeFilter.driver),
-              ),
-              _Chip(
-                label: 'باحث عن خط',
-                selected: _typeFilter == _TypeFilter.rider,
-                onTap: () => setState(() => _typeFilter = _TypeFilter.rider),
               ),
             ],
           ),
@@ -355,34 +308,6 @@ class _SoftStat extends StatelessWidget {
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onTap(),
-      selectedColor: c.primary.withValues(alpha: 0.14),
-      checkmarkColor: c.primary,
-      labelStyle: GoogleFonts.ibmPlexSansArabic(
-        fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-        fontSize: 13,
-      ),
-    );
-  }
-}
-
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({
     required this.title,
@@ -459,15 +384,7 @@ class _SoftContactTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final typeBits = <String>[];
-    if (typeFilter == _TypeFilter.all) {
-      if (entry.driverCount > 0) typeBits.add('سائق ${entry.driverCount}');
-      if (entry.riderCount > 0) typeBits.add('باحث ${entry.riderCount}');
-    } else if (typeFilter == _TypeFilter.driver) {
-      typeBits.add('سائق $count');
-    } else {
-      typeBits.add('باحث $count');
-    }
+    final typeBits = <String>['$count ظهور'];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),

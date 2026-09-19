@@ -13,8 +13,8 @@ import 'native_share.dart';
 /// share API is unavailable (common on some desktop browsers).
 Future<void> shareAppLink(BuildContext context) async {
   final link = AppHosts.publicUrl;
-  const title = 'خطوط بغداد';
-  const text = 'خطوط بغداد — نظّم وابحث عن خطوط النقل المشترك في بغداد';
+  const title = 'دليل خطوط بغداد';
+  const text = 'دليل خطوط بغداد — نظّم وابحث عن خطوط النقل المشترك في بغداد';
   final payload = '$text\n$link';
 
   // 1) Browser Web Share API → full OS sheet (WhatsApp, Messages, Copy, …)

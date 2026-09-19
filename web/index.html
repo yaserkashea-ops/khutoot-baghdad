@@ -5,7 +5,23 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="خطوط بغداد — تنظيم إعلانات خطوط النقل المشترك في بغداد.">
+  <title>دليل خطوط بغداد</title>
+  <meta name="description" content="دليل خطوط بغداد — ابحث عن خطوط النقل المشترك في بغداد، وأضف خطك للدليل. ظهور الخط لمدة 30 يوماً مع إمكانية تجديد النشر.">
+  <meta name="keywords" content="دليل خطوط بغداد, خطوط بغداد, مواصلات بغداد, خطوط نقل بغداد, دليل مواصلات">
+  <meta name="author" content="دليل خطوط بغداد">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://khutoot-baghdad.web.app/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ar_IQ">
+  <meta property="og:site_name" content="دليل خطوط بغداد">
+  <meta property="og:title" content="دليل خطوط بغداد">
+  <meta property="og:description" content="دليل خطوط بغداد — ابحث عن خطوط النقل المشترك في بغداد وأضف خطك للدليل.">
+  <meta property="og:url" content="https://khutoot-baghdad.web.app/">
+  <meta property="og:image" content="https://khutoot-baghdad.web.app/icons/app-icon-512-v19.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="دليل خطوط بغداد">
+  <meta name="twitter:description" content="دليل خطوط بغداد — ابحث عن خطوط النقل المشترك في بغداد وأضف خطك للدليل.">
+  <meta name="twitter:image" content="https://khutoot-baghdad.web.app/icons/app-icon-512-v19.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <meta name="theme-color" content="#053F3E" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#F4F8F7" media="(prefers-color-scheme: dark)">
@@ -14,13 +30,28 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="خطوط بغداد">
-  <link rel="apple-touch-icon" href="icons/app-icon-192-v18.png">
-  <link rel="apple-touch-icon" sizes="512x512" href="icons/app-icon-512-v18.png">
+  <meta name="apple-mobile-web-app-title" content="دليل خطوط بغداد">
+  <link rel="apple-touch-icon" href="icons/app-icon-192-v19.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="icons/app-icon-512-v19.png">
 
-  <link rel="icon" type="image/png" href="favicon-v18.png"/>
-  <title>خطوط بغداد</title>
+  <link rel="icon" type="image/png" href="favicon-v19.png"/>
   <link rel="manifest" href="manifest.json">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "دليل خطوط بغداد",
+    "alternateName": ["خطوط بغداد", "دليل مواصلات بغداد"],
+    "url": "https://khutoot-baghdad.web.app/",
+    "description": "دليل خطوط بغداد — ابحث عن خطوط النقل المشترك في بغداد وأضف خطك للدليل.",
+    "inLanguage": "ar",
+    "publisher": {
+      "@type": "Organization",
+      "name": "دليل خطوط بغداد",
+      "url": "https://khutoot-baghdad.web.app/"
+    }
+  }
+  </script>
   <link rel="dns-prefetch" href="https://plqhpbtkgforuvqferou.supabase.co">
   <link rel="preconnect" href="https://plqhpbtkgforuvqferou.supabase.co" crossorigin>
   <link rel="preload" href="flutter_bootstrap.js" as="script">
@@ -64,13 +95,20 @@
 </head>
 <body>
   <div class="masarat-boot" id="masarat-boot">
-    <img src="favicon-v18.png" width="64" height="64" alt="خطوط بغداد" decoding="async" fetchpriority="high">
-    <span id="masarat-boot-title">خطوط بغداد</span>
+    <img src="favicon-v19.png" width="64" height="64" alt="دليل خطوط بغداد" decoding="async" fetchpriority="high">
+    <span id="masarat-boot-title">دليل خطوط بغداد</span>
   </div>
+  <noscript>
+    <main style="max-width:40rem;margin:2rem auto;padding:1rem;font-family:Tahoma,sans-serif;line-height:1.7;direction:rtl;text-align:right">
+      <h1>دليل خطوط بغداد</h1>
+      <p>دليل خطوط بغداد موقع للبحث عن خطوط النقل المشترك في بغداد وإضافة خطك إلى الدليل.</p>
+      <p>فعّل JavaScript لفتح الدليل الكامل.</p>
+    </main>
+  </noscript>
 
   <script>
     (function () {
-      var CACHE_BUST = 'v80';
+      var CACHE_BUST = 'v175';
       var ADMIN_ORIGIN = 'https://khutoot-baghdad-admin.web.app';
       var VERSION_KEY = 'khutoot_build';
 
@@ -99,6 +137,7 @@
         mode: 'app',
         isStandalone: function () {
           return window.matchMedia('(display-mode: standalone)').matches
+            || window.matchMedia('(display-mode: minimal-ui)').matches
             || window.navigator.standalone === true;
         },
         isIos: function () {
@@ -107,8 +146,14 @@
             || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         },
         isMobile: function () {
-          return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
-            || (navigator.maxTouchPoints > 1 && window.innerWidth < 900);
+          var ua = navigator.userAgent || '';
+          if (/Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
+            return true;
+          }
+          if (navigator.maxTouchPoints > 1 && Math.min(window.innerWidth, window.screen.width) < 900) {
+            return true;
+          }
+          return false;
         },
         setMode: function () {},
         ensureAdminHash: function () {
@@ -120,14 +165,101 @@
           location.assign(ADMIN_ORIGIN + '/');
           return true;
         },
+        _hitBtn: null,
+        _ensureHitBtn: function () {
+          if (api._hitBtn) return api._hitBtn;
+          var b = document.createElement('button');
+          b.id = 'masarat-pwa-install-hit';
+          b.type = 'button';
+          b.setAttribute('aria-label', 'تثبيت التطبيق');
+          b.style.cssText = [
+            'display:none',
+            'position:fixed',
+            'left:20px',
+            'right:20px',
+            'bottom:88px',
+            'height:48px',
+            'z-index:2147483646',
+            'border:0',
+            'border-radius:12px',
+            'background:#053F3E',
+            'color:#F4F8F7',
+            'font-size:16px',
+            'font-weight:700',
+            'font-family:Tahoma,"Segoe UI",sans-serif',
+            'cursor:pointer',
+            'box-shadow:0 8px 24px rgba(5,63,62,0.28)',
+            'direction:rtl'
+          ].join(';');
+          b.addEventListener('click', function () {
+            // Must call prompt() synchronously under this click — no awaits first.
+            if (api.deferred) {
+              api.promptInstall().then(function (outcome) {
+                window.dispatchEvent(new CustomEvent('masarat-install-outcome', {
+                  detail: outcome || 'unavailable'
+                }));
+              });
+              return;
+            }
+            // No deferred yet: prepare SW, then ask user to tap again.
+            api.ensureReady().then(function (ready) {
+              window.dispatchEvent(new CustomEvent('masarat-install-outcome', {
+                detail: ready && api.deferred ? 'ready' : 'unavailable'
+              }));
+              window.dispatchEvent(new CustomEvent('masarat-install-state'));
+            });
+          });
+          document.body.appendChild(b);
+          api._hitBtn = b;
+          return b;
+        },
+        showInstallButton: function (label, bottomPx) {
+          var b = api._ensureHitBtn();
+          b.textContent = label || 'تثبيت الآن';
+          b.disabled = false;
+          if (typeof bottomPx === 'number' && bottomPx > 0) {
+            b.style.bottom = bottomPx + 'px';
+          }
+          b.style.display = 'block';
+        },
+        hideInstallButton: function () {
+          if (api._hitBtn) api._hitBtn.style.display = 'none';
+        },
+        ensureReady: function () {
+          if (!('serviceWorker' in navigator)) {
+            return Promise.resolve(!!api.deferred);
+          }
+          return navigator.serviceWorker
+            .register('/sw.js', { updateViaCache: 'none' })
+            .then(function () { return navigator.serviceWorker.ready; })
+            .then(function () {
+              if (api.deferred) return true;
+              return api.waitForPrompt(4000);
+            })
+            .catch(function () { return !!api.deferred; });
+        },
         promptInstall: async function () {
           if (!api.deferred) return 'unavailable';
-          api.deferred.prompt();
-          const choice = await api.deferred.userChoice;
-          api.deferred = null;
-          api.canInstall = false;
-          window.dispatchEvent(new CustomEvent('masarat-install-state'));
-          return choice.outcome;
+          // prompt() must run synchronously under a user gesture.
+          var evt = api.deferred;
+          try {
+            evt.prompt();
+          } catch (_) {
+            return 'unavailable';
+          }
+          try {
+            var choice = await evt.userChoice;
+            api.deferred = null;
+            api.canInstall = false;
+            window.dispatchEvent(new CustomEvent('masarat-install-state'));
+            if (choice && choice.outcome === 'accepted') {
+              try { recordAppInstall('app'); } catch (_) {}
+              return 'accepted';
+            }
+            return (choice && choice.outcome) || 'dismissed';
+          } catch (_) {
+            return 'dismissed';
+          }
         },
         waitForPrompt: function (ms) {
           return new Promise(function (resolve) {
@@ -147,9 +279,62 @@
             }
             window.addEventListener('masarat-install-state', onState);
           });
+        },
+        recordInstall: function (source) {
+          return recordAppInstall(source || 'app');
         }
       };
       window.__masaratPwa = api;
+
+      // Persist install counts even if Flutter is torn down mid-install.
+      var SUPABASE_URL = 'https://plqhpbtkgforuvqferou.supabase.co';
+      var SUPABASE_ANON = 'sb_publishable_SEVHXVQEu_yCz7dLNdIkCA_5H_odBRI';
+      var INSTALL_KEY = 'khutoot_install_key';
+      var INSTALL_RECORDED = 'khutoot_install_recorded_v1';
+
+      function installKey() {
+        try {
+          var k = localStorage.getItem(INSTALL_KEY);
+          if (k && k.length >= 8) return k;
+          k = String(Date.now()) + '-' + Math.floor(Math.random() * 1e9);
+          localStorage.setItem(INSTALL_KEY, k);
+          return k;
+        } catch (_) {
+          return String(Date.now()) + '-fallback';
+        }
+      }
+
+      function recordAppInstall(source) {
+        try {
+          if (localStorage.getItem(INSTALL_RECORDED) === '1') {
+            return Promise.resolve(false);
+          }
+        } catch (_) {}
+        var platform = api.isMobile() ? 'phone' : 'desktop';
+        var body = JSON.stringify({
+          p_install_key: installKey(),
+          p_platform: platform,
+          p_source: source === 'admin' ? 'admin' : 'app',
+          p_user_agent: navigator.userAgent || null
+        });
+        return fetch(SUPABASE_URL + '/rest/v1/rpc/record_app_install', {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON,
+            'Authorization': 'Bearer ' + SUPABASE_ANON,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: body,
+          keepalive: true
+        }).then(function (res) {
+          if (res && res.ok) {
+            try { localStorage.setItem(INSTALL_RECORDED, '1'); } catch (_) {}
+            return true;
+          }
+          return false;
+        }).catch(function () { return false; });
+      }
 
       window.addEventListener('beforeinstallprompt', function (e) {
         e.preventDefault();
@@ -160,53 +345,122 @@
       window.addEventListener('appinstalled', function () {
         api.deferred = null;
         api.canInstall = false;
+        try { sessionStorage.setItem('khutoot_just_installed', '1'); } catch (_) {}
+        try { localStorage.setItem('khutoot_just_installed_ls', '1'); } catch (_) {}
+        recordAppInstall('app');
         window.dispatchEvent(new CustomEvent('masarat-install-state'));
       });
 
-      function registerSw() {
-        if (!('serviceWorker' in navigator)) return;
-        navigator.serviceWorker.register('sw.js?v=' + CACHE_BUST).catch(function () {});
+      // Already-installed PWA (iOS Add to Home Screen, returning users).
+      if (api.isStandalone()) {
+        recordAppInstall('app');
       }
 
-      // Version check only AFTER first paint — never block/interrupt Flutter boot.
-      function ensureFreshBuild() {
-        (async function () {
-          try {
-            if ('serviceWorker' in navigator) {
-              var regs = await navigator.serviceWorker.getRegistrations();
-              await Promise.all(regs.map(function (r) {
-                var url = (r.active && r.active.scriptURL) ||
-                  (r.waiting && r.waiting.scriptURL) ||
-                  (r.installing && r.installing.scriptURL) || '';
-                if (url.indexOf('flutter_service_worker') !== -1) {
-                  return r.unregister();
-                }
-                return Promise.resolve();
-              }));
+      function registerSw() {
+        if (!('serviceWorker' in navigator)) return;
+        // Stable URL (no ?v=) — query-string SW scripts confuse some Chrome builds.
+        navigator.serviceWorker
+          .register('/sw.js', { updateViaCache: 'none' })
+          .then(function () { return navigator.serviceWorker.ready; })
+          .then(function () {
+            window.dispatchEvent(new CustomEvent('masarat-install-state'));
+          })
+          .catch(function () {});
+      }
+
+      function urlBase64ToUint8Array(base64String) {
+        var padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+        var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        var raw = atob(base64);
+        var out = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+        return out;
+      }
+
+      // Web Push subscribe → phone notification tray (Chrome/Android + installed PWA).
+      window.__khutootPushSubscribe = async function (vapidPublicKey) {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+        var reg = await navigator.serviceWorker.ready;
+        try {
+          var existing = await reg.pushManager.getSubscription();
+          if (existing) await existing.unsubscribe();
+        } catch (e) {}
+        var sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        });
+        var json = sub.toJSON();
+        return {
+          endpoint: json.endpoint || '',
+          p256dh: (json.keys && json.keys.p256dh) || '',
+          auth: (json.keys && json.keys.auth) || '',
+        };
+      };
+
+      window.__khutootPushUnsubscribe = async function () {
+        if (!('serviceWorker' in navigator)) return;
+        var reg = await navigator.serviceWorker.ready;
+        var existing = await reg.pushManager.getSubscription();
+        if (existing) await existing.unsubscribe();
+      };
+
+      function loadFlutter() {
+        var s = document.createElement('script');
+        s.src = 'flutter_bootstrap.js?v=' + encodeURIComponent(CACHE_BUST);
+        s.async = true;
+        document.body.appendChild(s);
+      }
+
+      // Version / SW cleanup BEFORE Flutter paints — never reload after home is shown.
+      (async function prepareBoot() {
+        try {
+          if ('serviceWorker' in navigator) {
+            var regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(function (r) {
+              var url = (r.active && r.active.scriptURL) ||
+                (r.waiting && r.waiting.scriptURL) ||
+                (r.installing && r.installing.scriptURL) || '';
+              if (url.indexOf('flutter_service_worker') !== -1) {
+                return r.unregister();
+              }
+              return Promise.resolve();
+            }));
+          }
+          var res = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+          var data = await res.json();
+          var remote = (data && data.version) || '';
+          var local = localStorage.getItem(VERSION_KEY) || '';
+          // Force refresh when remote build differs from this HTML or from last boot.
+          var stale = (remote && remote !== CACHE_BUST) ||
+            (remote && local && remote !== local) ||
+            (local && local !== CACHE_BUST);
+          if (stale && !sessionStorage.getItem('khutoot_reloading')) {
+            sessionStorage.setItem('khutoot_reloading', '1');
+            if ('caches' in window) {
+              var keys = await caches.keys();
+              await Promise.all(keys.map(function (k) { return caches.delete(k); }));
             }
-            var res = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
-            var data = await res.json();
-            var remote = (data && data.version) || '';
-            var local = localStorage.getItem(VERSION_KEY) || '';
-            if (remote && local && remote !== local && !sessionStorage.getItem('khutoot_reloading')) {
-              sessionStorage.setItem('khutoot_reloading', '1');
-              if ('caches' in window) {
-                var keys = await caches.keys();
-                await Promise.all(keys.map(function (k) { return caches.delete(k); }));
-              }
-              if ('serviceWorker' in navigator) {
-                var all = await navigator.serviceWorker.getRegistrations();
-                await Promise.all(all.map(function (r) { return r.unregister(); }));
-              }
-              localStorage.setItem(VERSION_KEY, remote);
-              location.reload();
-              return;
+            if ('serviceWorker' in navigator) {
+              var all = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(all.map(function (r) { return r.unregister(); }));
             }
             if (remote) localStorage.setItem(VERSION_KEY, remote);
-            sessionStorage.removeItem('khutoot_reloading');
-          } catch (_) {}
-        })();
-      }
+            else localStorage.setItem(VERSION_KEY, CACHE_BUST);
+            var url = new URL(location.href);
+            url.searchParams.set('_v', remote || CACHE_BUST);
+            url.searchParams.set('_t', String(Date.now()));
+            location.replace(url.toString());
+            return;
+          }
+          if (remote) localStorage.setItem(VERSION_KEY, remote);
+          else localStorage.setItem(VERSION_KEY, CACHE_BUST);
+          sessionStorage.removeItem('khutoot_reloading');
+        } catch (_) {}
+        // Do NOT register our SW before Flutter boots — Flutter's bootstrap
+        // sees any existing SW and tries to activate flutter_service_worker,
+        // which can hang forever on the splash screen.
+        loadFlutter();
+      })();
 
       window.addEventListener('flutter-first-frame', function () {
         const el = document.getElementById('masarat-boot');
@@ -215,26 +469,22 @@
           setTimeout(function () { el.remove(); }, 80);
         }
         if (window.requestIdleCallback) {
-          window.requestIdleCallback(function () {
-            ensureFreshBuild();
-            registerSw();
-          }, { timeout: 1500 });
+          window.requestIdleCallback(function () { registerSw(); }, { timeout: 1500 });
         } else {
-          setTimeout(function () {
-            ensureFreshBuild();
-            registerSw();
-          }, 400);
+          setTimeout(registerSw, 400);
         }
       });
+
+      // Failsafe: never leave users on the green splash forever.
       setTimeout(function () {
-        // Keep splash visible; only hide after first Flutter frame.
-        // Removing it early left a blank white screen on slow networks.
-        var title = document.getElementById('masarat-boot-title');
-        if (title) title.textContent = 'خطوط بغداد — جارٍ التحميل…';
-      }, 8000);
+        var el = document.getElementById('masarat-boot');
+        if (el) {
+          el.style.opacity = '0';
+          setTimeout(function () { if (el.parentNode) el.remove(); }, 80);
+        }
+        try { registerSw(); } catch (_) {}
+      }, 12000);
     })();
   </script>
-
-  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

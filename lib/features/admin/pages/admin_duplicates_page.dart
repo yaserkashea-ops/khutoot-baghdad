@@ -161,6 +161,7 @@ class _AdminDuplicatesPageState extends State<AdminDuplicatesPage> {
         builder: (_) => PublishListingPage(
           repository: ListingsRepository.shared,
           initial: listing,
+          allowFreeTextPlaces: true,
         ),
       ),
     );

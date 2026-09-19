@@ -19,8 +19,19 @@ abstract final class ListingMapper {
       genderRequirement: _genderFrom(row['gender_requirement'] as String?),
       contactPhone: row['contact_phone'] as String?,
       contactTelegram: row['contact_telegram'] as String?,
+      ownerAccountId: row['owner_account_id'] as String?,
+      viewCount: _int(row['view_count']) ?? 0,
+      status: _statusFrom(row['status'] as String?),
+      governorate: (row['governorate'] as String?)?.trim().isNotEmpty == true
+          ? (row['governorate'] as String).trim()
+          : 'بغداد',
+      adminNote: row['admin_note'] as String?,
+      referenceCode: row['reference_code'] as String?,
       createdAt: _date(row['created_at']),
       updatedAt: _date(row['updated_at']),
+      bumpedAt: _date(row['bumped_at']),
+      expiresAt: _date(row['expires_at']),
+      isHidden: row['is_hidden'] == true,
     );
   }
 
@@ -39,6 +50,19 @@ abstract final class ListingMapper {
       'gender_requirement': _genderTo(listing.genderRequirement),
       'contact_phone': listing.contactPhone,
       'contact_telegram': listing.contactTelegram,
+      if (listing.ownerAccountId != null &&
+          listing.ownerAccountId!.trim().isNotEmpty)
+        'owner_account_id': listing.ownerAccountId,
+      'status': _statusTo(listing.status),
+      'governorate': listing.governorate.trim().isEmpty
+          ? 'بغداد'
+          : listing.governorate.trim(),
+      if (listing.adminNote != null) 'admin_note': listing.adminNote,
+      if (listing.referenceCode != null)
+        'reference_code': listing.referenceCode,
+      if (listing.expiresAt != null)
+        'expires_at': listing.expiresAt!.toUtc().toIso8601String(),
+      'is_hidden': listing.isHidden,
     };
   }
 
@@ -68,6 +92,12 @@ abstract final class ListingMapper {
     if (value == null) return null;
     if (value is DateTime) return value;
     return DateTime.tryParse(value.toString());
+  }
+
+  static int? _int(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    return int.tryParse(value.toString());
   }
 
   static ListingType _typeFrom(String? value) => switch (value) {
@@ -101,6 +131,24 @@ abstract final class ListingMapper {
         GenderRequirement.femaleOnly => 'female_only',
         GenderRequirement.mixed => 'mixed',
       };
+
+  static ListingStatus _statusFrom(String? value) => switch (value) {
+        'pending_review' => ListingStatus.pendingReview,
+        'awaiting_payment' => ListingStatus.awaitingPayment,
+        'rejected' => ListingStatus.rejected,
+        'published' => ListingStatus.published,
+        // Legacy rows without status column → treat as published.
+        _ => ListingStatus.published,
+      };
+
+  static String _statusTo(ListingStatus status) => switch (status) {
+        ListingStatus.pendingReview => 'pending_review',
+        ListingStatus.awaitingPayment => 'awaiting_payment',
+        ListingStatus.published => 'published',
+        ListingStatus.rejected => 'rejected',
+      };
+
+  static String statusToDb(ListingStatus status) => _statusTo(status);
 }
 
 abstract final class AdminReportMapper {

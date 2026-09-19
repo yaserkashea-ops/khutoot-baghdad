@@ -17,7 +17,6 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
   final _search = TextEditingController();
   List<Listing> _items = [];
   bool _loading = true;
-  String? _typeFilter; // driver | rider
 
   @override
   void initState() {
@@ -33,7 +32,7 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final all = await ListingsRepository.shared.fetchAll();
+    final all = await ListingsRepository.shared.fetchAll(publishedOnly: false);
     if (!mounted) return;
     setState(() {
       _items = all;
@@ -44,18 +43,22 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
   List<Listing> get _filtered {
     final q = _search.text.trim();
     return _items.where((l) {
-      if (_typeFilter == 'driver' && !l.isDriver) return false;
-      if (_typeFilter == 'rider' && l.isDriver) return false;
       if (q.isEmpty) return true;
       final blob = [
         l.area,
         l.destination,
         l.contactPhone ?? '',
         l.contactTelegram ?? '',
+        l.statusLabel,
+        l.referenceCode ?? '',
+        l.id,
         ...l.originSubs,
         ...l.destinationSubs,
       ].join(' ');
-      return blob.contains(q);
+      return blob.toLowerCase().contains(q.toLowerCase()) ||
+          (l.referenceCode ?? '')
+              .toUpperCase()
+              .contains(q.trim().toUpperCase());
     }).toList();
   }
 
@@ -103,10 +106,36 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
         builder: (_) => PublishListingPage(
           repository: ListingsRepository.shared,
           initial: listing,
+          allowFreeTextPlaces: true,
         ),
       ),
     );
     if (saved != null) await _load();
+  }
+
+  Future<void> _publishManual() async {
+    final saved = await Navigator.of(context).push<Listing>(
+      MaterialPageRoute(
+        builder: (_) => PublishListingPage(
+          repository: ListingsRepository.shared,
+          initialType: ListingType.driver,
+          allowFreeTextPlaces: true,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (saved != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'تم نشر الخط في الدليل',
+            style: GoogleFonts.ibmPlexSansArabic(),
+          ),
+        ),
+      );
+      await _load();
+    }
   }
 
   @override
@@ -114,7 +143,16 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
     final c = context.colors;
     final filtered = _filtered;
 
-    return Column(
+    return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _publishManual,
+        icon: const Icon(Icons.add),
+          label: Text(
+          'إضافة خط',
+          style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
+        ),
+      ),
+      body: Column(
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -125,7 +163,7 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
                 onChanged: (_) => setState(() {}),
                 style: GoogleFonts.ibmPlexSansArabic(),
                 decoration: InputDecoration(
-                  hintText: 'بحث بالمنطقة أو الوجهة أو رقم التواصل',
+                  hintText: 'بحث برقم الطلب أو المنطقة أو الوجهة أو التواصل',
                   hintStyle: GoogleFonts.ibmPlexSansArabic(fontSize: 13),
                   prefixIcon: const Icon(Icons.search),
                   filled: true,
@@ -139,31 +177,12 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
                 ),
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  _FilterChip(
-                    label: 'الكل',
-                    selected: _typeFilter == null,
-                    onTap: () => setState(() => _typeFilter = null),
-                  ),
-                  const SizedBox(width: 8),
-                  _FilterChip(
-                    label: 'سائق لديه خط',
-                    selected: _typeFilter == 'driver',
-                    onTap: () => setState(() => _typeFilter = 'driver'),
-                  ),
-                  const SizedBox(width: 8),
-                  _FilterChip(
-                    label: 'يبحث عن خط',
-                    selected: _typeFilter == 'rider',
-                    onTap: () => setState(() => _typeFilter = 'rider'),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${filtered.length}',
-                    style: GoogleFonts.manrope(fontWeight: FontWeight.w600),
-                  ),
-                ],
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Text(
+                  '${filtered.length}',
+                  style: GoogleFonts.manrope(fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           ),
@@ -178,6 +197,7 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
                   color: c.primary,
                   onRefresh: _load,
                   child: ListView.separated(
+                    padding: const EdgeInsets.only(bottom: 88),
                     itemCount: filtered.length,
                     separatorBuilder: (_, _) =>
                         Divider(height: 1, color: c.border),
@@ -191,7 +211,7 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
                           ),
                         ),
                         subtitle: Text(
-                          '${l.typeLabel} · ${l.scheduleLabel}\n'
+                          '${l.statusLabel} · ${l.scheduleLabel}\n'
                           '${l.contactPhone ?? l.contactTelegram ?? '—'}',
                           style: GoogleFonts.ibmPlexSansArabic(fontSize: 12),
                         ),
@@ -226,45 +246,7 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
                 ),
         ),
       ],
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Material(
-      color: selected ? c.primary.withValues(alpha: 0.12) : c.surface,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: selected ? c.primary : c.border,
-            ),
-          ),
-          child: Text(
-            label,
-            style: GoogleFonts.ibmPlexSansArabic(
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-              fontSize: 12,
-              color: selected ? c.primary : c.text,
-            ),
-          ),
-        ),
-      ),
+    ),
     );
   }
 }

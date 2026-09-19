@@ -3,14 +3,25 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../core/config/admin_contact.dart';
+import '../../core/config/directory_launch.dart';
+import '../../core/auth/publisher_auth_controller.dart';
+import '../../core/auth/publisher_limits.dart';
 import '../../core/data/baghdad_places.dart';
 import '../../core/data/learned_places_store.dart';
+import '../../core/data/places_catalog.dart';
 import '../../core/models/listing.dart';
+import '../../core/models/listing_subscription.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/place_text_rules.dart';
 import '../../data/listings_repository.dart';
+import '../../data/publisher_repository.dart';
+import 'publisher_auth_sheet.dart';
 import 'widgets/suggestible_text_field.dart';
 
 /// Publish / edit form for transit listings.
@@ -21,6 +32,8 @@ class PublishListingPage extends StatefulWidget {
     this.initial,
     this.initialType,
     this.draftOnly = false,
+    this.allowFreeTextPlaces = false,
+    this.asDirectoryRequest = false,
   });
 
   final ListingsRepository repository;
@@ -31,6 +44,13 @@ class PublishListingPage extends StatefulWidget {
 
   /// When true, save returns the [Listing] via `Navigator.pop` without writing to the repo.
   final bool draftOnly;
+
+  /// Admin panel: main area/destination accept any text (suggestions still available).
+  /// Public publish/edit stays list-only.
+  final bool allowFreeTextPlaces;
+
+  /// Driver submits a review request (not live in the directory).
+  final bool asDirectoryRequest;
 
   @override
   State<PublishListingPage> createState() => _PublishListingPageState();
@@ -57,19 +77,23 @@ class _PublishListingPageState extends State<PublishListingPage> {
   bool _saving = false;
   List<String> _originSubs = [];
   List<String> _destinationSubs = [];
-  List<String> _knownAreas = BaghdadPlaces.areas;
-  List<String> _knownDestinations = BaghdadPlaces.destinations;
 
-  bool get _isEditing => _editingId != null;
+  List<String> get _knownAreas => PlacesCatalog.shared.areas;
+  List<String> get _knownDestinations => PlacesCatalog.shared.destinations;
+
+  bool get _isEditing =>
+      !widget.draftOnly &&
+      _editingId != null &&
+      _editingId!.trim().isNotEmpty;
 
   @override
   void initState() {
     super.initState();
     final initial = widget.initial;
-    _type = initial?.type ?? widget.initialType ?? ListingType.driver;
+    _type = ListingType.driver;
     _gender = initial?.genderRequirement ?? GenderRequirement.mixed;
     _timePeriod = initial?.timePeriod;
-    _editingId = widget.draftOnly ? null : initial?.id;
+    _editingId = initial?.id;
     _originSubs = List<String>.from(initial?.originSubs ?? const []);
     _destinationSubs = List<String>.from(initial?.destinationSubs ?? const []);
     _area = TextEditingController(text: initial?.area ?? '');
@@ -84,58 +108,39 @@ class _PublishListingPageState extends State<PublishListingPage> {
     );
     _phone = TextEditingController(text: initial?.contactPhone ?? '');
     _telegram = TextEditingController(text: initial?.contactTelegram ?? '');
-    _loadPlaceOptions();
+    unawaited(LearnedPlacesStore.purgeUserPlaces());
+    PlacesCatalog.shared.addListener(_onPlacesChanged);
+    unawaited(PlacesCatalog.shared.refresh());
+    if (widget.asDirectoryRequest && !_isEditing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_ensurePublisherAccountOrLeave());
+      });
+    }
   }
 
-  Future<void> _loadPlaceOptions() async {
-    final results = await Future.wait([
-      widget.repository.fetchAll(),
-      LearnedPlacesStore.areas(),
-      LearnedPlacesStore.destinations(),
-    ]);
+  /// Directory submissions require a publisher account before filling the form.
+  Future<void> _ensurePublisherAccountOrLeave() async {
+    final auth = PublisherAuthController.shared;
+    if (!auth.isLoaded) await auth.load();
     if (!mounted) return;
-    final items = results[0] as List<Listing>;
-    final learnedAreas = results[1] as List<String>;
-    final learnedDestinations = results[2] as List<String>;
-    setState(() {
-      _knownAreas = BaghdadPlaces.areasWith([
-        ...learnedAreas,
-        ...items.map((e) => e.area),
-        ...items.expand((e) => e.originSubs),
-      ]);
-      _knownDestinations = BaghdadPlaces.destinationsWith([
-        ...learnedDestinations,
-        ...items.map((e) => e.destination),
-        ...items.expand((e) => e.destinationSubs),
-      ]);
-    });
+    if (auth.isLoggedIn) return;
+    final ok = await showPublisherAuthSheet(
+      context,
+      title: 'إنشاء حساب مطلوب لإضافة خطك',
+    );
+    if (!mounted) return;
+    if (!ok || !PublisherAuthController.shared.isLoggedIn) {
+      Navigator.of(context).maybePop();
+    }
   }
 
-  Future<void> _learnPlace({String? area, String? destination}) async {
-    if (area != null && area.trim().isNotEmpty) {
-      await LearnedPlacesStore.rememberArea(area);
-    }
-    if (destination != null && destination.trim().isNotEmpty) {
-      await LearnedPlacesStore.rememberDestination(destination);
-    }
-    if (!mounted) return;
-    final learnedAreas = await LearnedPlacesStore.areas();
-    final learnedDestinations = await LearnedPlacesStore.destinations();
-    if (!mounted) return;
-    setState(() {
-      _knownAreas = BaghdadPlaces.areasWith([
-        ...learnedAreas,
-        ..._knownAreas,
-      ]);
-      _knownDestinations = BaghdadPlaces.destinationsWith([
-        ...learnedDestinations,
-        ..._knownDestinations,
-      ]);
-    });
+  void _onPlacesChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    PlacesCatalog.shared.removeListener(_onPlacesChanged);
     _area.dispose();
     _destination.dispose();
     _originSubInput.dispose();
@@ -173,12 +178,6 @@ class _PublishListingPageState extends State<PublishListingPage> {
       assign([...list, value]);
       input.clear();
     });
-    unawaited(
-      _learnPlace(
-        area: asArea ? value : null,
-        destination: asArea ? null : value,
-      ),
-    );
   }
 
   /// Commit any typed sub-place still sitting in the input (without pressing إضافة).
@@ -209,8 +208,44 @@ class _PublishListingPageState extends State<PublishListingPage> {
     setState(() => assign(list.where((e) => e != value).toList()));
   }
 
-  String? _placeRequired(String? value) =>
-      PlaceTextRules.validate(value, required: true);
+  bool get _listedOnlyPlaces => !widget.allowFreeTextPlaces;
+
+  int get _mainPlaceMaxLength => PlaceTextRules.listedMaxLength;
+
+  /// Free-text custom places stay capped; listed names use the higher field limit.
+  int? get _mainPlaceTypingMaxWords =>
+      _listedOnlyPlaces ? PlaceTextRules.maxCustomWords : null;
+
+  String? _placeRequired(String? value) {
+    if (!_listedOnlyPlaces) {
+      // Free-text mode: still accept long catalog names; custom text ≤ 20.
+      return PlaceTextRules.validateMain(
+        value,
+        options: _knownAreas,
+        listedOnly: false,
+      );
+    }
+    return PlaceTextRules.validateMain(
+      value,
+      options: _knownAreas,
+      listedOnly: true,
+    );
+  }
+
+  String? _destinationRequired(String? value) {
+    if (!_listedOnlyPlaces) {
+      return PlaceTextRules.validateMain(
+        value,
+        options: _knownDestinations,
+        listedOnly: false,
+      );
+    }
+    return PlaceTextRules.validateMain(
+      value,
+      options: _knownDestinations,
+      listedOnly: true,
+    );
+  }
 
   String? _placeOptional(String? value) =>
       PlaceTextRules.validate(value, maxLength: PlaceTextRules.subMaxLength);
@@ -253,6 +288,41 @@ class _PublishListingPageState extends State<PublishListingPage> {
       return;
     }
 
+    final areaCanonical = PlaceTextRules.canonicalizeMain(
+      _area.text,
+      _knownAreas,
+      listedOnly: _listedOnlyPlaces,
+    );
+    final destCanonical = PlaceTextRules.canonicalizeMain(
+      _destination.text,
+      _knownDestinations,
+      listedOnly: _listedOnlyPlaces,
+    );
+    if (areaCanonical == null || destCanonical == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        _toast(
+          _listedOnlyPlaces
+              ? 'اختر منطقة ووجهة من القائمة فقط'
+              : 'أدخل المنطقة والوجهة',
+        ),
+      );
+      return;
+    }
+    final areaErr = _placeRequired(areaCanonical);
+    final destErr = _destinationRequired(destCanonical);
+    if (areaErr != null || destErr != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        _toast(areaErr ?? destErr!),
+      );
+      return;
+    }
+    if (_area.text.trim() != areaCanonical) {
+      _area.text = areaCanonical;
+    }
+    if (_destination.text.trim() != destCanonical) {
+      _destination.text = destCanonical;
+    }
+
     if (_type == ListingType.driver) {
       if (_vehicle.text.trim().isEmpty || _seats.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -265,6 +335,43 @@ class _PublishListingPageState extends State<PublishListingPage> {
     setState(() => _saving = true);
 
     try {
+      final auth = PublisherAuthController.shared;
+      if (!auth.isLoaded) await auth.load();
+      if (widget.asDirectoryRequest && !auth.isLoggedIn) {
+        if (!mounted) return;
+        setState(() => _saving = false);
+        final ok = await showPublisherAuthSheet(
+          context,
+          title: 'إنشاء حساب مطلوب لإضافة خطك',
+        );
+        if (!mounted || !ok || !PublisherAuthController.shared.isLoggedIn) {
+          return;
+        }
+      }
+      if (!_isEditing &&
+          !widget.draftOnly &&
+          auth.isLoggedIn) {
+        final mine = await PublisherRepository.shared.myListings();
+        if (mine.length >= PublisherLimits.maxActiveListings) {
+          if (!mounted) return;
+          setState(() => _saving = false);
+          await showDialog<void>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('وصلت للحد الأقصى'),
+              content: Text(PublisherLimits.limitReachedMessage),
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('حسناً'),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+      }
+
       final seats = int.tryParse(_seats.text.trim());
       final draft = Listing(
         id: _editingId ?? '',
@@ -280,45 +387,105 @@ class _PublishListingPageState extends State<PublishListingPage> {
         returnTime:
             _returnTime.text.trim().isEmpty ? null : _returnTime.text.trim(),
         genderRequirement: _gender,
-        vehicleType:
-            _type == ListingType.driver ? _vehicle.text.trim() : null,
-        seatsCount: _type == ListingType.driver ? seats : null,
+        vehicleType: _vehicle.text.trim(),
+        seatsCount: seats,
         contactPhone: phone.isEmpty ? null : phone,
         contactTelegram: telegram.isEmpty ? null : telegram,
       );
 
       if (widget.draftOnly) {
-        await LearnedPlacesStore.rememberFromListing(
-          area: draft.area,
-          destination: draft.destination,
-          originSubs: draft.originSubs,
-          destinationSubs: draft.destinationSubs,
+        final draftWithId = draft.copyWith(
+          id: (_editingId != null && _editingId!.isNotEmpty)
+              ? _editingId
+              : draft.id,
         );
         if (!mounted) return;
-        Navigator.of(context).pop(draft);
+        Navigator.of(context).pop(draftWithId);
         return;
       }
 
       if (_isEditing) {
         final updated = await widget.repository.update(draft);
-        await LearnedPlacesStore.rememberFromListing(
-          area: updated.area,
-          destination: updated.destination,
-          originSubs: updated.originSubs,
-          destinationSubs: updated.destinationSubs,
-        );
         if (!mounted) return;
         if (Navigator.of(context).canPop()) {
           Navigator.of(context).pop(updated);
         }
-      } else {
-        final created = await widget.repository.insert(draft);
-        await LearnedPlacesStore.rememberFromListing(
-          area: created.area,
-          destination: created.destination,
-          originSubs: created.originSubs,
-          destinationSubs: created.destinationSubs,
+      } else if (widget.asDirectoryRequest) {
+        var created = await widget.repository.submitRequest(
+          draft.copyWith(
+            type: ListingType.driver,
+            status: ListingStatus.pendingReview,
+            governorate: 'بغداد',
+            ownerAccountId: auth.accountId,
+          ),
         );
+        if (auth.isLoggedIn) {
+          try {
+            created =
+                await PublisherRepository.shared.claimListing(created.id);
+          } on PostgrestException catch (e) {
+            if (e.message.toUpperCase().contains('LISTING_LIMIT')) {
+              try {
+                await widget.repository.deleteById(created.id);
+              } catch (_) {}
+              if (mounted) {
+                await showDialog<void>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('وصلت للحد الأقصى'),
+                    content: Text(PublisherLimits.limitReachedMessage),
+                    actions: [
+                      FilledButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('حسناً'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return;
+            }
+          } catch (_) {}
+        }
+        if (!mounted) return;
+        await _showRequestSubmitted(created);
+        if (!mounted) return;
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(created);
+        }
+      } else {
+        // Admin / legacy direct publish → live in directory.
+        var created = await widget.repository.insert(
+          draft.copyWith(status: ListingStatus.published),
+        );
+        if (auth.isLoggedIn) {
+          try {
+            created =
+                await PublisherRepository.shared.claimListing(created.id);
+          } on PostgrestException catch (e) {
+            if (e.message.toUpperCase().contains('LISTING_LIMIT')) {
+              try {
+                await widget.repository.deleteById(created.id);
+              } catch (_) {}
+              if (mounted) {
+                await showDialog<void>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('وصلت للحد الأقصى'),
+                    content: Text(PublisherLimits.limitReachedMessage),
+                    actions: [
+                      FilledButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('حسناً'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return;
+            }
+          } catch (_) {}
+        }
         if (!mounted) return;
         if (Navigator.of(context).canPop()) {
           Navigator.of(context).pop(created);
@@ -327,6 +494,111 @@ class _PublishListingPageState extends State<PublishListingPage> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _showRequestSubmitted(Listing created) async {
+    final c = context.colors;
+    final ref = created.referenceCode ?? created.id;
+    final days = ListingSubscription.periodDays;
+    final hideFees = DirectoryLaunch.hidePaymentCopy;
+    final message = hideFees
+        ? 'مرحباً، أرسلت طلب نشر خط في دليل خطوط بغداد.\n'
+            'رقم الطلب: $ref\n'
+            'المسار: ${created.area} ← ${created.destination}\n'
+            'التوقيت: ${created.timePeriodLabel}\n'
+            'صلاحية الظهور بعد النشر: $days يوماً، ثم أجدّد النشر بعدها.\n'
+            'أرجو مراجعة الطلب وإعلامي عند الجاهزية للنشر.'
+        : 'مرحباً، أرسلت طلب نشر خط في دليل خطوط بغداد.\n'
+            'رقم الطلب: $ref\n'
+            'المسار: ${created.area} ← ${created.destination}\n'
+            'التوقيت: ${created.timePeriodLabel}\n'
+            'صلاحية الظهور بعد النشر: $days يوماً ثم التجديد.\n'
+            'أرجو مراجعة الطلب وإعلامي بخطوات الدفع.';
+    final steps = hideFees
+        ? '1) تراجع الإدارة الطلب\n'
+            '2) قد نتواصل معك عبر واتساب أو تلغرام عند الحاجة\n'
+            '3) بعد الموافقة يُنشر الخط في الدليل لمدة $days يوماً\n'
+            '4) بعد انتهاء المدة عليك تجديد النشر ليبقى ظاهراً'
+        : '1) تراجع الإدارة الطلب\n'
+            '2) تُكمل دفع رسوم النشر عبر واتساب أو تلغرام\n'
+            '3) بعد تأكيد الدفع يُنشر الخط لمدة $days يوماً\n'
+            '4) بعد انتهاء المدة عليك تجديد النشر ليبقى ظاهراً';
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(
+            'تم إرسال طلبك للمراجعة',
+            style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'رقم الطلب: $ref',
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    color: c.primary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  steps,
+                  style: GoogleFonts.ibmPlexSansArabic(height: 1.5),
+                ),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: message));
+                    final uri = Uri.parse(AdminContact.whatsappUrl(message));
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  },
+                  icon: const Icon(Icons.chat),
+                  label: const Text('متابعة عبر واتساب'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: message));
+                    final uri = Uri.parse(AdminContact.telegram);
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  },
+                  icon: const Icon(Icons.send_outlined),
+                  label: const Text('متابعة عبر تلغرام'),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: message));
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'تم نسخ تفاصيل الطلب',
+                            style: GoogleFonts.ibmPlexSansArabic(),
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('نسخ تفاصيل الطلب'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('تم'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   SnackBar _toast(String message) {
@@ -351,8 +623,12 @@ class _PublishListingPageState extends State<PublishListingPage> {
       appBar: AppBar(
         title: Text(
           widget.draftOnly
-              ? 'تعديل المسودة'
-              : (_isEditing ? 'تعديل الإعلان' : 'نشر إعلان'),
+              ? ((widget.initial?.id.isNotEmpty ?? false)
+                  ? 'تعديل بيانات الخط'
+                  : 'تعديل المسودة')
+              : widget.asDirectoryRequest
+                  ? 'أضف خطك للدليل'
+                  : (_isEditing ? 'تعديل الإعلان' : 'نشر إعلان'),
         ),
       ),
       body: Form(
@@ -365,71 +641,64 @@ class _PublishListingPageState extends State<PublishListingPage> {
               padding: const EdgeInsetsDirectional.fromSTEB(14, 6, 14, 28),
               children: [
             Text(
-              'نوع الإعلان',
-              style: _sectionLabel(c),
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: _TypeToggle(
-                    label: 'أنا سائق',
-                    selected: _type == ListingType.driver,
-                    accent: c.accent,
-                    onTap: () => setState(() => _type = ListingType.driver),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _TypeToggle(
-                    label: 'أبحث عن خط',
-                    selected: _type == ListingType.rider,
-                    accent: c.riderAccent,
-                    onTap: () => setState(() => _type = ListingType.rider),
-                  ),
-                ),
-              ],
+              widget.asDirectoryRequest
+                  ? 'أدخل تفاصيل خطك ليظهر في الدليل لمدة ${ListingSubscription.periodDays} يوماً، ثم جدّد النشر بعدها'
+                  : 'أدخل تفاصيل الخط',
+              style: GoogleFonts.ibmPlexSansArabic(
+                fontSize: 12,
+                height: 1.45,
+                color: c.text.withValues(alpha: 0.62),
+              ),
             ),
             const SizedBox(height: 14),
             SuggestibleTextField(
               fieldKey: const Key('field_area'),
-              label: 'منطقة الانطلاق الرئيسية',
+              label: 'المنطقة التي ينطلق منها الخط',
               controller: _area,
               validator: _placeRequired,
               options: _knownAreas,
               addMissingLabel: BaghdadPlaces.addMissingArea,
-              hint: 'مثال: العامرية',
-              helperText: _type == ListingType.driver
-                  ? 'المنطقة العامة التي يبدأ منها الخط'
-                  : 'المنطقة العامة التي تريد الانطلاق منها',
-              maxLength: PlaceTextRules.maxLength,
-              inputFormatters: const [PlaceTextInputFormatter()],
-              onCommitted: (v) => unawaited(_learnPlace(area: v)),
+              hint: _listedOnlyPlaces
+                  ? 'اختر من القائمة'
+                  : 'اكتب بحرية أو اختر من القائمة',
+              listedOnly: _listedOnlyPlaces,
+              maxLength: _mainPlaceMaxLength,
+              inputFormatters: [
+                PlaceTextInputFormatter(
+                  maxLength: _mainPlaceMaxLength,
+                  singleOnly: _listedOnlyPlaces,
+                  maxWords: _mainPlaceTypingMaxWords,
+                  lettersWordsOnly: _listedOnlyPlaces,
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             SuggestibleTextField(
               fieldKey: const Key('field_destination'),
-              label: 'الوجهة الرئيسية',
+              label: 'المنطقة التي يصل اليها الخط',
               controller: _destination,
-              hint: 'مثال: الجادرية',
-              helperText: _type == ListingType.driver
-                  ? 'المنطقة العامة التي يصل إليها الخط'
-                  : 'المنطقة العامة التي تريد الوصول إليها',
-              validator: _placeRequired,
+              validator: _destinationRequired,
               options: _knownDestinations,
               addMissingLabel: BaghdadPlaces.addMissingDestination,
-              maxLength: PlaceTextRules.maxLength,
-              inputFormatters: const [PlaceTextInputFormatter()],
-              onCommitted: (v) => unawaited(_learnPlace(destination: v)),
+              hint: _listedOnlyPlaces
+                  ? 'اختر من القائمة'
+                  : 'اكتب بحرية أو اختر من القائمة',
+              listedOnly: _listedOnlyPlaces,
+              maxLength: _mainPlaceMaxLength,
+              inputFormatters: [
+                PlaceTextInputFormatter(
+                  maxLength: _mainPlaceMaxLength,
+                  singleOnly: _listedOnlyPlaces,
+                  maxWords: _mainPlaceTypingMaxWords,
+                  lettersWordsOnly: _listedOnlyPlaces,
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             _SubPlacesBlock(
-              title: _type == ListingType.driver
-                  ? 'عناوين فرعية ينطلق منها الخط (اختياري)'
-                  : 'عنوان فرعي تنطلق منه (اختياري)',
-              hint: _type == ListingType.driver
-                  ? 'اذكر الأحياء أو الشوارع التي يمر بها الخط داخل منطقة الانطلاق'
-                  : 'اذكر الحي أو الشارع الذي تنطلق منه',
+              title: 'عناوين فرعية ينطلق منها الخط (اختياري)',
+              hint:
+                  'اذكر الأحياء أو الشوارع التي يمر بها الخط داخل منطقة الانطلاق',
               field: SuggestibleTextField(
                 fieldKey: const Key('field_origin_sub'),
                 label: '',
@@ -463,19 +732,14 @@ class _PublishListingPageState extends State<PublishListingPage> {
             ),
             const SizedBox(height: 10),
             _SubPlacesBlock(
-              title: _type == ListingType.driver
-                  ? 'عناوين فرعية يصل إليها الخط (اختياري)'
-                  : 'عنوان فرعي تصل إليه (اختياري)',
-              hint: _type == ListingType.driver
-                  ? 'اذكر الأحياء أو الشوارع التي يصل إليها الخط داخل الوجهة'
-                  : 'اذكر الحي أو الشارع أو الجامعة أو الدائرة التي تصل إليها',
+              title: 'عناوين فرعية يصل إليها الخط (اختياري)',
+              hint:
+                  'اذكر الأحياء أو الشوارع التي يصل إليها الخط داخل الوجهة',
               field: SuggestibleTextField(
                 fieldKey: const Key('field_destination_sub'),
                 label: '',
                 controller: _destinationSubInput,
-                hint: _type == ListingType.driver
-                    ? 'مثال: مجمع الجادرية'
-                    : 'مثال: جامعة بغداد',
+                hint: 'مثال: مجمع الجادرية',
                 options: _knownDestinations,
                 addMissingLabel: BaghdadPlaces.addMissingDestination,
                 validator: _placeOptional,
@@ -517,25 +781,23 @@ class _PublishListingPageState extends State<PublishListingPage> {
                 ),
               ),
             ],
-            if (_type == ListingType.driver) ...[
-              const SizedBox(height: 10),
-              _Field(
-                fieldKey: const Key('field_vehicle'),
-                label: 'نوع السيارة',
-                controller: _vehicle,
-                validator: _required,
-              ),
-              const SizedBox(height: 10),
-              _Field(
-                fieldKey: const Key('field_seats'),
-                label: 'عدد المقاعد',
-                controller: _seats,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                style: AppTheme.manrope(fontSize: 14, color: c.text),
-                validator: _required,
-              ),
-            ],
+            const SizedBox(height: 10),
+            _Field(
+              fieldKey: const Key('field_vehicle'),
+              label: 'نوع السيارة',
+              controller: _vehicle,
+              validator: _required,
+            ),
+            const SizedBox(height: 10),
+            _Field(
+              fieldKey: const Key('field_seats'),
+              label: 'عدد المقاعد',
+              controller: _seats,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              style: AppTheme.manrope(fontSize: 14, color: c.text),
+              validator: _required,
+            ),
             const SizedBox(height: 10),
             Text('التوقيت', style: _sectionLabel(c)),
             const SizedBox(height: 2),
@@ -697,7 +959,13 @@ class _PublishListingPageState extends State<PublishListingPage> {
                           color: c.onPrimary,
                         ),
                       )
-                    : Text(_isEditing ? 'حفظ التعديل' : 'نشر'),
+                    : Text(
+                        _isEditing
+                            ? 'حفظ التعديل'
+                            : (widget.asDirectoryRequest
+                                ? 'إرسال للمراجعة'
+                                : 'نشر'),
+                      ),
               ),
             ),
               ],
@@ -779,55 +1047,6 @@ class _SubPlacesBlock extends StatelessWidget {
     );
   }
 }
-
-class _TypeToggle extends StatelessWidget {
-  const _TypeToggle({
-    required this.label,
-    required this.selected,
-    required this.accent,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final Color accent;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Material(
-      color: selected ? accent.withValues(alpha: 0.1) : c.surface.withValues(alpha: 0.92),
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: selected ? accent.withValues(alpha: 0.85) : c.border.withValues(alpha: 0.85),
-            ),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.ibmPlexSansArabic(
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-              fontSize: 12,
-              height: 1.25,
-              color: selected ? accent : c.text.withValues(alpha: 0.85),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _ChoiceChip extends StatelessWidget {
   const _ChoiceChip({
     required this.label,

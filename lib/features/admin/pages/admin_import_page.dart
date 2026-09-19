@@ -168,6 +168,7 @@ class _AdminImportPageState extends State<AdminImportPage> {
           repository: ListingsRepository.shared,
           initial: draft.listing,
           draftOnly: true,
+          allowFreeTextPlaces: true,
         ),
       ),
     );

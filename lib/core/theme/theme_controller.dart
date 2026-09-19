@@ -18,13 +18,17 @@ class ThemeController extends ChangeNotifier {
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_prefsKey);
-    _mode = switch (raw) {
+    final next = switch (raw) {
       'light' => ThemeMode.light,
       'dark' => ThemeMode.dark,
       'system' => ThemeMode.system,
       _ => ThemeMode.light,
     };
     _loaded = true;
+    // Avoid rebuilding MaterialApp when the stored mode matches the default —
+    // that remount felt like the app "reopening" ~1s after first paint.
+    if (next == _mode) return;
+    _mode = next;
     notifyListeners();
   }
 

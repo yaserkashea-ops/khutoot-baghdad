@@ -7,7 +7,11 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/admin_repository.dart';
 
 /// Professional single-sheet report flow (no stacked dialogs).
-Future<void> showContactAdminSheet(BuildContext context) {
+Future<void> showContactAdminSheet(
+  BuildContext context, {
+  AdminContactKind? initialKind,
+  String? initialMessage,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -16,14 +20,23 @@ Future<void> showContactAdminSheet(BuildContext context) {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
-    builder: (context) => const _ReportFlowSheet(),
+    builder: (context) => _ReportFlowSheet(
+      initialKind: initialKind,
+      initialMessage: initialMessage,
+    ),
   );
 }
 
 enum _ReportStep { pickKind, compose, success }
 
 class _ReportFlowSheet extends StatefulWidget {
-  const _ReportFlowSheet();
+  const _ReportFlowSheet({
+    this.initialKind,
+    this.initialMessage,
+  });
+
+  final AdminContactKind? initialKind;
+  final String? initialMessage;
 
   @override
   State<_ReportFlowSheet> createState() => _ReportFlowSheetState();
@@ -35,10 +48,21 @@ class _ReportFlowSheetState extends State<_ReportFlowSheet> {
   final _phone = TextEditingController();
   final _telegram = TextEditingController();
 
-  _ReportStep _step = _ReportStep.pickKind;
+  late _ReportStep _step;
   AdminContactKind? _kind;
   bool _submitting = false;
   String? _formError;
+
+  @override
+  void initState() {
+    super.initState();
+    final message = widget.initialMessage?.trim();
+    if (message != null && message.isNotEmpty) {
+      _details.text = message;
+    }
+    _kind = widget.initialKind;
+    _step = _kind != null ? _ReportStep.compose : _ReportStep.pickKind;
+  }
 
   @override
   void dispose() {
@@ -176,8 +200,10 @@ class _ReportFlowSheetState extends State<_ReportFlowSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Icon(Icons.support_agent_rounded, size: 40, color: c.primary),
+        const SizedBox(height: 10),
         Text(
-          'التواصل مع الإدارة',
+          'موظفة الدعم',
           textAlign: TextAlign.center,
           style: GoogleFonts.ibmPlexSansArabic(
             fontWeight: FontWeight.w700,
@@ -187,15 +213,91 @@ class _ReportFlowSheetState extends State<_ReportFlowSheet> {
         ),
         const SizedBox(height: 6),
         Text(
-          'اختر نوع الرسالة، ثم اكتب التفاصيل في خطوة واحدة.',
+          'تواصل مباشرة مع الإدارة عبر واتساب أو تلغرام — الأسرع للمساعدة.',
           textAlign: TextAlign.center,
           style: GoogleFonts.ibmPlexSansArabic(
-            fontSize: 13,
-            height: 1.4,
-            color: c.text.withValues(alpha: 0.6),
+            fontSize: 13.5,
+            height: 1.45,
+            color: c.text.withValues(alpha: 0.65),
           ),
         ),
         const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            color: c.primary.withValues(alpha: 0.07),
+            border: Border.all(color: c.primary.withValues(alpha: 0.22)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'تواصل الآن',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: c.primary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                onPressed: () => _openExternal(
+                  Uri.parse(
+                    AdminContact.whatsappUrl(
+                      'مرحباً، أحتاج مساعدة من إدارة خطوط بغداد.',
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.chat_rounded, size: 20),
+                label: Text(
+                  'واتساب الإدارة',
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: c.primary,
+                  foregroundColor: c.onPrimary,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              FilledButton.tonalIcon(
+                onPressed: () =>
+                    _openExternal(Uri.parse(AdminContact.telegram)),
+                icon: const Icon(Icons.send_rounded, size: 18),
+                label: Text(
+                  'تلغرام الإدارة',
+                  style: GoogleFonts.ibmPlexSansArabic(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'أو أرسل رسالة من داخل الأداة',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.ibmPlexSansArabic(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: c.text.withValues(alpha: 0.5),
+          ),
+        ),
+        const SizedBox(height: 10),
         for (final kind in AdminContactKind.values) ...[
           _KindTile(
             title: kind.label,
@@ -203,7 +305,7 @@ class _ReportFlowSheetState extends State<_ReportFlowSheet> {
             icon: switch (kind) {
               AdminContactKind.report => Icons.flag_outlined,
               AdminContactKind.complaint => Icons.report_problem_outlined,
-              AdminContactKind.problem => Icons.support_agent_outlined,
+              AdminContactKind.problem => Icons.build_outlined,
             },
             onTap: () => _pickKind(kind),
           ),
@@ -380,52 +482,24 @@ class _ReportFlowSheetState extends State<_ReportFlowSheet> {
         ),
         const SizedBox(height: 18),
         Text(
-          'متابعة اختيارية',
+          'أو تابع عبر واتساب / تلغرام',
           textAlign: TextAlign.center,
           style: GoogleFonts.ibmPlexSansArabic(
-            fontSize: 12,
-            color: c.text.withValues(alpha: 0.5),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: c.text.withValues(alpha: 0.55),
           ),
         ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
+        const SizedBox(height: 10),
+        FilledButton.icon(
           onPressed: () => _openExternal(
             Uri.parse(AdminContact.whatsappUrl(followUp)),
           ),
-          icon: const Icon(Icons.chat_outlined, size: 18),
+          icon: const Icon(Icons.chat_rounded, size: 18),
           label: Text(
             'واتساب الإدارة',
-            style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
+            style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
           ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: c.primary,
-            side: BorderSide(color: c.primary.withValues(alpha: 0.4)),
-            minimumSize: const Size.fromHeight(44),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: () => _openExternal(Uri.parse(AdminContact.telegram)),
-          icon: const Icon(Icons.send_outlined, size: 18),
-          label: Text(
-            'تلغرام الإدارة',
-            style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: c.primary,
-            side: BorderSide(color: c.primary.withValues(alpha: 0.4)),
-            minimumSize: const Size.fromHeight(44),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        FilledButton(
-          onPressed: _close,
           style: FilledButton.styleFrom(
             backgroundColor: c.primary,
             foregroundColor: c.onPrimary,
@@ -434,6 +508,25 @@ class _ReportFlowSheetState extends State<_ReportFlowSheet> {
               borderRadius: BorderRadius.circular(10),
             ),
           ),
+        ),
+        const SizedBox(height: 8),
+        FilledButton.tonalIcon(
+          onPressed: () => _openExternal(Uri.parse(AdminContact.telegram)),
+          icon: const Icon(Icons.send_rounded, size: 18),
+          label: Text(
+            'تلغرام الإدارة',
+            style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
+          ),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(44),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextButton(
+          onPressed: _close,
           child: Text(
             'تم',
             style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),

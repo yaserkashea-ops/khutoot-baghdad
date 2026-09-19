@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://khutoot-baghdad.web.app/sitemap.xml

@@ -5,8 +5,6 @@ abstract final class BaghdadPlaces {
   /// مناطق وأحياء وأقضية بغداد (كرخ + رصافة + أطراف المحافظة).
   static const areas = <String>[
     // —— أقضية رئيسية ——
-    'الكرخ',
-    'الرصافة',
     'الكاظمية',
     'الأعظمية',
     'المنصور',
@@ -45,7 +43,7 @@ abstract final class BaghdadPlaces {
     'الرضوانية',
     'اليوسفية',
     'جكوك',
-    'حي الخضراء (المنطقة الخضراء)',
+    'حي الخضراء',
     'المنطقة الخضراء',
     'قصر الزقورة',
     'الطوبجي',
@@ -73,8 +71,6 @@ abstract final class BaghdadPlaces {
     'الحرية',
     'القادسية',
     'المسبح',
-    'الجامعة',
-    'الخضراء',
     'الإسكان',
     'حي التراث',
     'حي الصحة',
@@ -87,7 +83,6 @@ abstract final class BaghdadPlaces {
     'سبع البور',
     'الجوادين',
     'الراشدية',
-    'المحمدية',
     'النهرين',
 
     // —— الرصافة وأحيائها ——
@@ -109,6 +104,7 @@ abstract final class BaghdadPlaces {
     'حي الخطيب',
     'شارع فلسطين',
     'فلسطين',
+    'حي القاهرة',
     'شارع الرشيد',
     'شارع أبو نواس',
     'شارع المتنبي',
@@ -245,7 +241,6 @@ abstract final class BaghdadPlaces {
 
     // —— مولات ومراكز تسوق ——
     'بغداد مول',
-    'مانسور مول',
     'مول المنصور',
     'الحبيبية مول',
     'النخيل مول',
@@ -285,7 +280,6 @@ abstract final class BaghdadPlaces {
     'نصب الجندي المجهول',
     'نصب الحرية',
     'قصر المؤتمرات',
-    'مدينة الألعاب',
     'جزيرة بغداد السياحية',
   ];
 
@@ -322,8 +316,8 @@ abstract final class BaghdadPlaces {
   /// الوجهة = كل المناطق والأقضية + المؤسسات والمعالم (الأساسية أولاً).
   static List<String> get destinations => destinationsWith(const []);
 
-  static const addMissingArea = 'منطقتي غير موجودة؟ أضفها';
-  static const addMissingDestination = 'وجهتي غير موجودة؟ أضفها';
+  static const addMissingArea = 'منطقتي غير موجودة؟ تواصل مع الإدارة';
+  static const addMissingDestination = 'وجهتي غير موجودة؟ تواصل مع الإدارة';
 
   /// Option label to pin a freely typed place name.
   static String pinTypedLabel(String typed) => 'ثبّت «${typed.trim()}»';
