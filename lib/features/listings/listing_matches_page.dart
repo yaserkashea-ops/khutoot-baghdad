@@ -1,13 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/auth/publisher_auth_controller.dart';
+import '../../core/config/directory_launch.dart';
+import '../../core/config/unlock_payment.dart';
 import '../../core/matches/listing_route_match.dart';
 import '../../core/matches/match_seen_store.dart';
+import '../../core/models/contact_unlock.dart';
 import '../../core/models/listing.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/listing_contact.dart';
+import '../../core/widgets/contact_options_sheet.dart';
+import '../../data/contact_unlocks_repository.dart';
 import '../../data/listings_repository.dart';
+import 'publish_listing_page.dart';
+import 'publish_rider_page.dart';
+import 'publish_role_sheet.dart';
+import 'publisher_auth_sheet.dart';
 import 'widgets/listing_card.dart';
+import 'widgets/rider_book_sheet.dart';
 
 class ListingMatchesPage extends StatefulWidget {
   const ListingMatchesPage({super.key, required this.mine});
@@ -21,6 +32,7 @@ class ListingMatchesPage extends StatefulWidget {
 class _ListingMatchesPageState extends State<ListingMatchesPage> {
   List<Listing> _matches = const [];
   Set<String> _newIds = {};
+  Map<String, ContactUnlock> _unlocks = const {};
   bool _loading = true;
   String? _error;
   int _newCount = 0;
@@ -39,6 +51,13 @@ class _ListingMatchesPageState extends State<ListingMatchesPage> {
     try {
       final rows =
           await ListingsRepository.shared.fetchRouteMatches(widget.mine);
+      var unlocks = <String, ContactUnlock>{};
+      if (!DirectoryLaunch.freeRiderContacts) {
+        try {
+          final mineUnlocks = await ContactUnlocksRepository.shared.mine();
+          unlocks = {for (final u in mineUnlocks) u.riderRequestId: u};
+        } catch (_) {}
+      }
       final seen = await MatchSeenStore.seenIds(widget.mine.id);
       final fresh = <String>{};
       for (final m in rows) {
@@ -49,6 +68,7 @@ class _ListingMatchesPageState extends State<ListingMatchesPage> {
         _matches = rows;
         _newIds = fresh;
         _newCount = fresh.length;
+        _unlocks = unlocks;
         _loading = false;
       });
       if (rows.isNotEmpty) {
@@ -66,7 +86,54 @@ class _ListingMatchesPageState extends State<ListingMatchesPage> {
     }
   }
 
+  Future<void> _inviteAdd({required bool asRider}) async {
+    final auth = PublisherAuthController.shared;
+    if (!auth.isLoaded) await auth.load();
+    if (!auth.isLoggedIn) {
+      if (!mounted) return;
+      final ok = await showPublisherAuthSheet(
+        context,
+        title: asRider ? 'سجّل لإضافة طلب راكب' : 'سجّل لإضافة خط سائق',
+        requiredToContinue: true,
+      );
+      if (!ok || !mounted) return;
+    }
+    if (!mounted) return;
+    if (!await confirmPublishLane(context, asRider: asRider)) return;
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => asRider
+            ? const PublishRiderPage()
+            : PublishListingPage(
+                repository: ListingsRepository.shared,
+                initialType: ListingType.driver,
+                asDirectoryRequest: true,
+              ),
+      ),
+    );
+  }
+
   Future<void> _onContact(Listing listing) async {
+    if (!listing.isDriver && !DirectoryLaunch.freeRiderContacts) {
+      final unlock = _unlocks[listing.id];
+      final updated = await openRiderBooking(
+        context,
+        listing: listing,
+        existing: unlock,
+      );
+      if (!mounted || updated == null) return;
+      setState(() {
+        _unlocks = {..._unlocks, listing.id: updated};
+        if (updated.isPending || updated.isApproved) {
+          _matches = [
+            for (final l in _matches)
+              l.id == listing.id ? l.copyWith(isBooked: true) : l,
+          ];
+        }
+      });
+      return;
+    }
     final options = ListingContact.optionsFor(listing);
     if (!mounted) return;
     if (options.isEmpty) {
@@ -75,55 +142,10 @@ class _ListingMatchesPageState extends State<ListingMatchesPage> {
       );
       return;
     }
-    final c = context.colors;
-    final chosen = await showModalBottomSheet<ContactOption>(
-      context: context,
-      backgroundColor: c.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'اختر وسيلة التواصل',
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                for (final option in options) ...[
-                  ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: c.border),
-                    ),
-                    title: Text(
-                      option.label,
-                      style: GoogleFonts.ibmPlexSansArabic(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    subtitle: option.detail == null ||
-                            option.detail!.trim().isEmpty
-                        ? null
-                        : Text(option.detail!),
-                    trailing: const Icon(Icons.chevron_left),
-                    onTap: () => Navigator.pop(ctx, option),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
+    final chosen = await showContactOptionsSheet(
+      context,
+      title: listing.isDriver ? 'تواصل مع السائق' : 'تواصل مع الراكب',
+      options: options,
     );
     if (chosen == null) return;
     await ListingContact.openUrl(chosen.url);
@@ -181,7 +203,7 @@ class _ListingMatchesPageState extends State<ListingMatchesPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'مطابقات $counterpart حسب المنطقة والوجهة الرئيسيتين فقط',
+                        'مطابقات $counterpart عند تطابق الانطلاق والوجهة معاً (رئيسية أو فرعية) ونفس التوقيت',
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontSize: 13,
                           height: 1.4,
@@ -207,7 +229,7 @@ class _ListingMatchesPageState extends State<ListingMatchesPage> {
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                'لا توجد مطابقات بعد',
+                                'لا توجد مطابقات لهذا البحث',
                                 style: GoogleFonts.ibmPlexSansArabic(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 15,
@@ -216,12 +238,24 @@ class _ListingMatchesPageState extends State<ListingMatchesPage> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'عند نشر خط أو طلب بنفس منطقتك ووجهتك سيظهر هنا',
+                                widget.mine.isDriver
+                                    ? 'لا طلب مطابق. أضف خط سائق ليظهر للركاب.'
+                                    : 'لا خط مطابق. أضف طلب خط ليظهر للسائقين.',
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.ibmPlexSansArabic(
                                   fontSize: 13,
                                   height: 1.45,
                                   color: c.text.withValues(alpha: 0.58),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              FilledButton(
+                                onPressed: () =>
+                                    _inviteAdd(asRider: !widget.mine.isDriver),
+                                child: Text(
+                                  widget.mine.isDriver
+                                      ? 'اضافة خط سائق'
+                                      : 'اضافة طلب خط',
                                 ),
                               ),
                             ],
@@ -231,10 +265,34 @@ class _ListingMatchesPageState extends State<ListingMatchesPage> {
                         for (var i = 0; i < _matches.length; i++) ...[
                           if (i > 0) const SizedBox(height: 10),
                           ListingCard(
-                            listing: _matches[i],
+                            listing: () {
+                              final item = _matches[i];
+                              if (item.isDriver ||
+                                  DirectoryLaunch.freeRiderContacts) {
+                                return item;
+                              }
+                              final revealed =
+                                  _unlocks[item.id]?.isApproved == true;
+                              return revealed
+                                  ? item
+                                  : item.withoutPublicContacts();
+                            }(),
                             badgeLabel: _newIds.contains(_matches[i].id)
                                 ? 'جديد'
                                 : null,
+                            revealPending: DirectoryLaunch.freeRiderContacts
+                                ? false
+                                : _unlocks[_matches[i].id]?.isPending == true,
+                            contactRevealed:
+                                DirectoryLaunch.freeRiderContacts ||
+                                    _unlocks[_matches[i].id]?.isApproved == true,
+                            contactLabel: _matches[i].isDriver
+                                ? null
+                                : (DirectoryLaunch.freeRiderContacts ||
+                                        _unlocks[_matches[i].id]?.isApproved ==
+                                            true
+                                    ? 'تواصل مع الراكب'
+                                    : UnlockPayment.bookAction),
                             onContact: () => _onContact(_matches[i]),
                           ),
                         ],

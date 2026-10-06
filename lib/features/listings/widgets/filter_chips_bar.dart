@@ -9,6 +9,7 @@ import '../../../core/data/places_catalog.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/place_text_rules.dart';
 import '../../support/contact_admin_sheet.dart';
+import '../directory_mode.dart';
 import 'place_options_menu.dart';
 
 /// Mobile-first search panel for transit listings.
@@ -30,18 +31,21 @@ class FilterChipsBar extends StatelessWidget {
     required this.onReturnQueryChanged,
     this.extraAreaOptions = const [],
     this.extraDestinationOptions = const [],
+    this.ridersTab = false,
+    this.onRidersTabChanged,
+    this.onShowResults,
   });
 
   final List<String> timeSlots;
   final String areaQuery;
   final String destinationQuery;
-  final String? selectedTimeSlot;
+  final String selectedTimeSlot;
   final String? selectedGender;
   final String departureQuery;
   final String returnQuery;
   final ValueChanged<String> onAreaQueryChanged;
   final ValueChanged<String> onDestinationQueryChanged;
-  final ValueChanged<String?> onTimeSlotChanged;
+  final ValueChanged<String> onTimeSlotChanged;
   final ValueChanged<String?> onGenderChanged;
   final ValueChanged<String> onDepartureQueryChanged;
   final ValueChanged<String> onReturnQueryChanged;
@@ -49,11 +53,13 @@ class FilterChipsBar extends StatelessWidget {
   /// Sub-places (and listing mains) merged into the from/to search lists.
   final List<String> extraAreaOptions;
   final List<String> extraDestinationOptions;
+  final bool ridersTab;
+  final ValueChanged<bool>? onRidersTabChanged;
+  final VoidCallback? onShowResults;
 
   static const genderOptions = <(String key, String label)>[
     ('female_only', 'بنات'),
     ('male_only', 'ذكور'),
-    ('mixed', 'مختلط'),
   ];
 
   String? get _genderLabel {
@@ -195,26 +201,87 @@ class FilterChipsBar extends StatelessWidget {
         });
         final genderHint = _genderLabel;
         final extraActive = _hasExtraFilters;
+        final mode = DirectoryMode(riders: ridersTab);
+        final accent = mode.accent(c);
 
-        return Column(
+        return Theme(
+          data: theme.copyWith(
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
+          ),
+          child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: c.border),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+            child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'ابحث عن خطك',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            height: 1.25,
+        if (onRidersTabChanged != null) ...[
+          _SegmentRow(
+            children: [
+              _Seg(
+                icon: DirectoryMode.lines.tabIcon,
+                label: DirectoryMode.lines.tabLabel,
+                selected: !ridersTab,
+                selectedColor: c.primary,
+                onTap: () => onRidersTabChanged!(false),
+              ),
+              _Seg(
+                icon: DirectoryMode.ridersLane.tabIcon,
+                label: DirectoryMode.ridersLane.tabLabel,
+                selected: ridersTab,
+                selectedColor: c.opportunity,
+                onTap: () => onRidersTabChanged!(true),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+        ] else ...[
+          Text(
+            mode.title,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 6),
+        ],
+        SizedBox(
+          height: _kCapH,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: accent.withValues(alpha: 0.08),
+              border: Border.all(color: accent.withValues(alpha: 0.18)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 14, color: accent),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      mode.hint,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 11,
+                        height: 1.1,
+                        color: c.text.withValues(alpha: 0.82),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          'اختر نقطة الانطلاق والوجهة للعثور على الخط المناسب',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: c.text.withValues(alpha: 0.62),
-            height: 1.45,
-          ),
-        ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         _DropdownSearchField(
           label: 'من أين؟',
           value: areaQuery,
@@ -232,40 +299,38 @@ class FilterChipsBar extends StatelessWidget {
           addMissingLabel: BaghdadPlaces.addMissingDestination,
           onChanged: onDestinationQueryChanged,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Text(
           'التوقيت',
           style: theme.textTheme.labelLarge?.copyWith(
-            fontSize: 12,
+            fontSize: 11.5,
             color: c.text.withValues(alpha: 0.55),
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         _SegmentRow(
-          children: [
-            _Seg(
-              label: 'الكل',
-              selected: selectedTimeSlot == null,
-              onTap: () => onTimeSlotChanged(null),
-            ),
-            ...timeSlots.map(
-              (t) => _Seg(
-                label: t,
-                selected: selectedTimeSlot == t,
-                onTap: () => onTimeSlotChanged(t),
-              ),
-            ),
-          ],
+          children: timeSlots
+              .map(
+                (t) => _Seg(
+                  label: t,
+                  selected: selectedTimeSlot == t,
+                  onTap: () => onTimeSlotChanged(t),
+                ),
+              )
+              .toList(),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 6),
+        if (onShowResults != null)
+          _SlimFillButton(onPressed: onShowResults!, label: 'عرض النتائج'),
+        const SizedBox(height: 2),
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: TextButton.icon(
             onPressed: () => _openExtraFilters(context),
             icon: Icon(
               Icons.tune_rounded,
-              size: 18,
-              color: extraActive ? c.primary : c.text.withValues(alpha: 0.7),
+              size: 16,
+              color: extraActive ? accent : c.text.withValues(alpha: 0.7),
             ),
             label: Text(
               genderHint == null
@@ -274,18 +339,25 @@ class FilterChipsBar extends StatelessWidget {
             ),
             style: TextButton.styleFrom(
               foregroundColor:
-                  extraActive ? c.primary : c.text.withValues(alpha: 0.85),
-              minimumSize: const Size(0, 44),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+                  extraActive ? accent : c.text.withValues(alpha: 0.85),
+              minimumSize: const Size(0, 32),
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             ),
           ),
         ),
       ],
-    );
+            ),
+          ),
+        ),
+        );
       },
     );
   }
 }
+
+const double _kCapH = 28;
 
 class _FilterChipChoice extends StatelessWidget {
   const _FilterChipChoice({
@@ -337,24 +409,28 @@ class _SegmentRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: c.border),
-      ),
-      child: Row(
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0)
-              Container(
-                width: 1,
-                height: 28,
-                color: c.border,
-              ),
-            Expanded(child: children[i]),
+    return SizedBox(
+      height: _kCapH,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: c.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: c.border),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0)
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: c.border,
+                ),
+              Expanded(child: children[i]),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -365,32 +441,81 @@ class _Seg extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.selectedColor,
+    this.icon,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final Color? selectedColor;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final accent = selectedColor ?? c.primary;
     return Material(
-      color: selected ? c.primary.withValues(alpha: 0.14) : Colors.transparent,
-      borderRadius: BorderRadius.circular(11),
+      color: selected ? accent.withValues(alpha: 0.16) : Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(11),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    fontSize: 12,
+                    height: 1,
+                    color: selected ? accent : c.text.withValues(alpha: 0.85),
+                  ),
+                ),
+              ),
+              if (icon != null) ...[
+                const SizedBox(width: 4),
+                Icon(icon, size: 14, color: selected ? accent : c.text),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SlimFillButton extends StatelessWidget {
+  const _SlimFillButton({required this.onPressed, required this.label});
+
+  final VoidCallback onPressed;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.primary,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
         child: SizedBox(
-          height: 44,
+          height: _kCapH,
+          width: double.infinity,
           child: Center(
             child: Text(
               label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+              style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 13,
-                color: selected ? c.primary : c.text.withValues(alpha: 0.85),
+                fontWeight: FontWeight.w700,
+                height: 1,
+                color: scheme.onPrimary,
               ),
             ),
           ),
@@ -496,12 +621,11 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
   void _cancelArm() {
     final restore = _typedBeforeArm;
     _typedBeforeArm = null;
-    if (restore != null) {
-      _controller.value = TextEditingValue(
-        text: restore,
-        selection: TextSelection.collapsed(offset: restore.length),
-      );
-    }
+    if (restore == null) return;
+    _controller.value = TextEditingValue(
+      text: restore,
+      selection: TextSelection.collapsed(offset: restore.length),
+    );
     _applyingSuggestion = false;
   }
 
@@ -522,7 +646,7 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
       width: _fieldWidth,
       optionsOf: () => widget.options,
       queryOf: () => _controller.text,
-      leadingOption: widget.requiredField ? null : _clearOption,
+      leadingOption: null,
       trailingOption: widget.addMissingLabel,
       onSelected: _onOptionSelected,
       onArmSelect: _armSelect,
@@ -730,12 +854,8 @@ class _DropdownSearchFieldState extends State<_DropdownSearchField> {
             return TapRegion(
               groupId: _tapGroup,
               onTapOutside: (_) {
-                if (_menu.isOpen) {
-                  _closeMenu();
-                  _applyingSuggestion = false;
-                  _typedBeforeArm = null;
-                  _finalizeListedOrReject();
-                }
+                if (_applyingSuggestion) return;
+                if (_menu.isOpen) _closeMenu();
               },
               child: KeyedSubtree(
                 key: _menu.targetKey,

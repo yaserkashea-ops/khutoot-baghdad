@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/auth/publisher_auth_controller.dart';
+import '../core/config/preview_mode.dart';
 import '../core/data/supabase_mappers.dart';
 import '../core/models/listing.dart';
 import 'listings_repository.dart';
@@ -14,6 +15,7 @@ class PublisherRepository {
   final SupabaseClient? _client;
 
   static SupabaseClient? _tryClient() {
+    if (PreviewMode.enabled) return null;
     try {
       return Supabase.instance.client;
     } catch (_) {
@@ -49,6 +51,13 @@ class PublisherRepository {
   }
 
   Future<Listing> claimListing(String listingId) async {
+    if (PreviewMode.enabled) {
+      final found = await ListingsRepository.shared.findById(listingId);
+      if (found == null) throw StateError('NOT_FOUND');
+      return ListingsRepository.shared.update(
+        found.copyWith(ownerAccountId: PublisherAuthController.shared.accountId),
+      );
+    }
     final client = _client;
     if (client == null) {
       throw StateError('NO_CLIENT');
@@ -64,6 +73,9 @@ class PublisherRepository {
   }
 
   Future<bool> deleteListing(String listingId) async {
+    if (PreviewMode.enabled) {
+      return ListingsRepository.shared.deleteById(listingId);
+    }
     final client = _client;
     if (client == null) return false;
     final ok = await client.rpc(
@@ -77,6 +89,9 @@ class PublisherRepository {
   }
 
   Future<Listing> republishListing(String listingId) async {
+    if (PreviewMode.enabled) {
+      return ListingsRepository.shared.renewListing(listingId);
+    }
     final client = _client;
     if (client == null) {
       throw StateError('NO_CLIENT');
@@ -92,6 +107,9 @@ class PublisherRepository {
   }
 
   Future<Listing> updateListing(Listing listing) async {
+    if (PreviewMode.enabled) {
+      return ListingsRepository.shared.update(listing);
+    }
     final client = _client;
     if (client == null) {
       throw StateError('NO_CLIENT');

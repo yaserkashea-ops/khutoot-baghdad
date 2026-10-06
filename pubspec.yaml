@@ -42,6 +42,7 @@ dependencies:
   web: ^1.1.1
   supabase_flutter: ^2.9.1
   share_plus: ^13.3.0
+  gal: ^2.3.3
 
 dev_dependencies:
   flutter_test:
@@ -68,6 +69,7 @@ flutter:
   assets:
     - assets/branding/brand-mark.png
     - assets/branding/brand-wordmark.png
+    - assets/branding/app-icon-source-1024.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

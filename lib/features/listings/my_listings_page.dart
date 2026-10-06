@@ -4,22 +4,42 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/auth/publisher_auth_controller.dart';
+import '../../core/config/directory_launch.dart';
 import '../../core/auth/publisher_limits.dart';
+import '../../core/matches/listing_route_match.dart';
+import '../../core/models/contact_unlock.dart';
 import '../../core/models/listing.dart';
-import '../../core/models/listing_subscription.dart';
+import '../../data/contact_unlocks_repository.dart';
+import '../../data/listings_repository.dart';
+import '../../data/publisher_repository.dart';
+import 'listing_matches_page.dart';
+import 'publish_listing_page.dart';
+import 'publish_rider_page.dart';
 import '../../core/notifications/match_notify_service.dart';
 import '../../core/notifications/notification_prefs.dart';
 import '../../core/notifications/notifications_bell_button.dart';
 import '../../core/notifications/publish_notify_service.dart';
+import '../../core/notifications/publisher_push_registrar.dart';
+import '../../core/pwa/share_app_button.dart';
 import '../../core/theme/app_colors.dart';
-import '../../data/listings_repository.dart';
-import '../../data/publisher_repository.dart';
-import 'publish_listing_page.dart';
+import '../../core/theme/theme_toggle_button.dart';
 import 'publisher_auth_sheet.dart';
-import 'widgets/listing_card.dart';
+import 'publish_role_sheet.dart';
+import '../../core/notifications/unlock_notify_service.dart';
+import '../../core/widgets/app_confirm_dialog.dart';
+import '../admin/widgets/share_listing_card_page.dart';
+import 'widgets/add_party_ctas.dart';
+import 'widgets/revealed_rider_sheet.dart';
 
 class MyListingsPage extends StatefulWidget {
-  const MyListingsPage({super.key});
+  const MyListingsPage({
+    super.key,
+    this.embedded = false,
+    this.onBrowse,
+  });
+
+  final bool embedded;
+  final VoidCallback? onBrowse;
 
   @override
   State<MyListingsPage> createState() => _MyListingsPageState();
@@ -27,8 +47,13 @@ class MyListingsPage extends StatefulWidget {
 
 class _MyListingsPageState extends State<MyListingsPage> {
   List<Listing> _items = const [];
+  List<ContactUnlock> _unlocks = const [];
   bool _loading = true;
   String? _error;
+  bool _matchesTab = false;
+  Map<String, int> _matchCounts = {};
+  bool _matchesLoading = false;
+  bool _guest = false;
 
   @override
   void initState() {
@@ -42,12 +67,13 @@ class _MyListingsPageState extends State<MyListingsPage> {
     if (!mounted) return;
     // الجلسة محفوظة محلياً — لا نطلب تسجيل دخول إن كان المستخدم مسجّلاً.
     if (!auth.isLoggedIn) {
-      final ok = await showPublisherAuthSheet(context);
       if (!mounted) return;
-      if (!ok || !PublisherAuthController.shared.isLoggedIn) {
-        Navigator.of(context).maybePop();
-        return;
-      }
+      setState(() {
+        _loading = false;
+        _guest = true;
+        _error = null;
+      });
+      return;
     }
     await _load();
     unawaited(_resumeNotifyServices());
@@ -59,6 +85,8 @@ class _MyListingsPageState extends State<MyListingsPage> {
     if (!prefs.enabled) return;
     MatchNotifyService.shared.start();
     PublishNotifyService.shared.start();
+    UnlockNotifyService.shared.start();
+    unawaited(PublisherPushRegistrar.register());
     await _checkPublishNotifications();
   }
 
@@ -84,11 +112,19 @@ class _MyListingsPageState extends State<MyListingsPage> {
     });
     try {
       final rows = await PublisherRepository.shared.myListings();
+      List<ContactUnlock> unlocks = const [];
+      if (!DirectoryLaunch.freeRiderContacts) {
+        try {
+          unlocks = await ContactUnlocksRepository.shared.mine();
+        } catch (_) {}
+      }
       if (!mounted) return;
       setState(() {
         _items = rows;
+        _unlocks = unlocks;
         _loading = false;
       });
+      unawaited(_refreshMatchCounts());
       await _checkPublishNotifications();
     } catch (_) {
       if (!mounted) return;
@@ -100,6 +136,8 @@ class _MyListingsPageState extends State<MyListingsPage> {
   }
 
   Future<void> _createListing() async {
+    if (!await confirmPublishLane(context, asRider: false)) return;
+    if (!mounted) return;
     if (_items.length >= PublisherLimits.maxActiveListings) {
       if (!mounted) return;
       await showDialog<void>(
@@ -143,7 +181,45 @@ class _MyListingsPageState extends State<MyListingsPage> {
     }
   }
 
+  Future<void> _createRiderRequest() async {
+    if (!await confirmPublishLane(context, asRider: true)) return;
+    if (!mounted) return;
+    if (_items.length >= PublisherLimits.maxActiveListings) {
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('وصلت للحد الأقصى'),
+          content: Text(
+            PublisherLimits.limitReachedMessage,
+            style: GoogleFonts.ibmPlexSansArabic(),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('حسناً'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    final saved = await Navigator.of(context).push<Listing>(
+      MaterialPageRoute(builder: (_) => const PublishRiderPage()),
+    );
+    if (!mounted) return;
+    if (saved != null) await _load();
+  }
+
   Future<void> _edit(Listing listing) async {
+    if (!listing.isDriver) {
+      final saved = await Navigator.of(context).push<Listing>(
+        MaterialPageRoute(builder: (_) => PublishRiderPage(initial: listing)),
+      );
+      if (!mounted || saved == null) return;
+      await _load();
+      return;
+    }
     final saved = await Navigator.of(context).push<Listing>(
       MaterialPageRoute(
         builder: (_) => PublishListingPage(
@@ -163,6 +239,34 @@ class _MyListingsPageState extends State<MyListingsPage> {
         const SnackBar(content: Text('تعذر حفظ التعديل')),
       );
     }
+  }
+
+  Future<void> _refreshListing(Listing listing) async {
+    final ok = await showAppConfirmDialog(
+      context,
+      title: 'تحديث المنشور؟',
+      body:
+          '${listing.area} ← ${listing.destination}\nسيظهر تاريخ آخر تحديث الآن في الدليل.',
+      confirmLabel: 'تحديث',
+    );
+    if (!ok || !mounted) return;
+    try {
+      await PublisherRepository.shared.republishListing(listing.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تحديث المنشور')),
+      );
+      await _load();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر تحديث المنشور')),
+      );
+    }
+  }
+
+  Future<void> _saveCardImage(Listing listing) {
+    return openShareListingCardPage(context, listing);
   }
 
   Future<void> _delete(Listing listing) async {
@@ -199,90 +303,42 @@ class _MyListingsPageState extends State<MyListingsPage> {
     await _load();
   }
 
-  Future<void> _previewInDirectory(Listing listing) async {
-    final c = context.colors;
-    final live = listing.isLiveInDirectory;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: c.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+  Future<void> _refreshMatchCounts() async {
+    final published = _items.where((l) => l.isPublished).toList();
+    if (published.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _matchCounts = {};
+          _matchesLoading = false;
+        });
+      }
+      return;
+    }
+    if (mounted) setState(() => _matchesLoading = true);
+    final counts = <String, int>{};
+    for (final listing in published) {
+      try {
+        final rows =
+            await ListingsRepository.shared.fetchRouteMatches(listing);
+        counts[listing.id] = rows.length;
+      } catch (_) {
+        counts[listing.id] = 0;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _matchCounts = counts;
+      _matchesLoading = false;
+    });
+  }
+
+  Future<void> _openMatches(Listing listing) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ListingMatchesPage(mine: listing),
       ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: c.border,
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'معاينة في الدليل',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 17,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  live
-                      ? 'هكذا يظهر خطك للباحثين في الدليل حالياً.'
-                      : listing.isExpired || listing.isHidden
-                          ? 'هذه معاينة لشكل البطاقة — الخط غير ظاهر للعامة حالياً.'
-                          : 'هذه معاينة لشكل البطاقة بعد النشر في الدليل.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    fontSize: 13,
-                    height: 1.45,
-                    color: c.text.withValues(alpha: 0.62),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                ListingCard(
-                  listing: listing,
-                  highlighted: true,
-                  badgeLabel: live ? 'خطك في الدليل' : 'معاينة',
-                  onContact: () {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(
-                        behavior: SnackBarBehavior.floating,
-                        content: Text(
-                          'هذه معاينة من حسابك — زر التواصل يظهر للباحثين في الدليل',
-                          style: GoogleFonts.ibmPlexSansArabic(),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text(
-                    'إغلاق',
-                    style: GoogleFonts.ibmPlexSansArabic(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
+    if (mounted) unawaited(_refreshMatchCounts());
   }
 
   @override
@@ -290,32 +346,33 @@ class _MyListingsPageState extends State<MyListingsPage> {
     final c = context.colors;
     final auth = PublisherAuthController.shared;
     final username = (auth.login ?? '').trim();
-    final canPublishNew = !_loading &&
-        _error == null &&
-        _items.isNotEmpty &&
-        _items.length < PublisherLimits.maxActiveListings;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('حسابي'),
-        actions: const [
-          NotificationsBellButton(),
+        actions: [
+          const ShareAppIconButton(),
+          const ThemeToggleButton(),
         ],
       ),
-      floatingActionButton: canPublishNew
-          ? FloatingActionButton.extended(
-              onPressed: _createListing,
-              icon: const Icon(Icons.add),
-              label: Text(
-                'أضف خطك',
-                style: GoogleFonts.ibmPlexSansArabic(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            )
-          : null,
       body: _loading
           ? Center(child: CircularProgressIndicator(color: c.primary))
+          : _guest
+              ? _GuestAccountPanel(
+                  onCreate: () async {
+                    final ok = await showPublisherAuthSheet(
+                      context,
+                      title: 'أنشئ حساباً لإدارة منشورك والرجوع إليه لاحقاً',
+                    );
+                    if (!mounted) return;
+                    if (ok && PublisherAuthController.shared.isLoggedIn) {
+                      setState(() => _guest = false);
+                      await _load();
+                    }
+                  },
+                  onBrowse: widget.onBrowse ??
+                      () => Navigator.of(context).maybePop(),
+                )
           : _error != null
               ? Center(
                   child: Padding(
@@ -388,40 +445,74 @@ class _MyListingsPageState extends State<MyListingsPage> {
                         const SizedBox(height: 10),
                       ],
                       const NotificationsEnableTile(),
-                      const SizedBox(height: 10),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                      const SizedBox(height: 14),
+                      DecoratedBox(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          color: c.primary.withValues(alpha: 0.08),
-                          border: Border.all(
-                            color: c.primary.withValues(alpha: 0.18),
-                          ),
+                          color: c.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: c.border),
                         ),
                         child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.schedule_outlined,
-                              size: 20,
-                              color: c.primary,
-                            ),
-                            const SizedBox(width: 10),
                             Expanded(
-                              child: Text(
-                                ListingSubscription.driverVisibilityNote,
-                                style: GoogleFonts.ibmPlexSansArabic(
-                                  fontSize: 13,
-                                  height: 1.45,
-                                  color: c.text.withValues(alpha: 0.82),
-                                ),
+                              child: _AccountTab(
+                                label: 'منشوراتي',
+                                selected: !_matchesTab,
+                                onTap: () =>
+                                    setState(() => _matchesTab = false),
+                              ),
+                            ),
+                            Expanded(
+                              child: _AccountTab(
+                                label: 'المطابقات',
+                                selected: _matchesTab,
+                                onTap: () =>
+                                    setState(() => _matchesTab = true),
                               ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 14),
+                      if (_matchesTab) ...[
+                        if (_matchesLoading)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 32),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (_items.where((l) => l.isPublished).isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 24),
+                            child: Column(
+                              children: [
+                                Text(
+                                  'لا يوجد طرف مطابق. إن كنت سائقاً أضف خطك، وإن كنت راكباً أضف طلبك.',
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    height: 1.45,
+                                    color: c.text.withValues(alpha: 0.62),
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                AddPartyCtas(
+                                  onAddLine: _createListing,
+                                  onAddRequest: _createRiderRequest,
+                                ),
+                              ],
+                            ),
+                          )
+                        else ...[
+                          for (final listing
+                              in _items.where((l) => l.isPublished)) ...[
+                            _MatchRouteTile(
+                              listing: listing,
+                              count: _matchCounts[listing.id] ?? 0,
+                              onOpen: () => _openMatches(listing),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                        ],
+                      ] else ...[
                       if (_items.isEmpty) ...[
                         const SizedBox(height: 14),
                         Icon(
@@ -441,8 +532,8 @@ class _MyListingsPageState extends State<MyListingsPage> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'أضف خطك ليظهر في الدليل لمدة ${ListingSubscription.periodDays} يوماً، '
-                          'ثم جدّد النشر بعدها من هنا',
+                          'أضف خط سائق ليظهر للركاب، أو طلب راكب ليظهر للسائقين. '
+                          'يمكنك تعديل منشورك في أي وقت — يعتمد الدليل على آخر تحديث.',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.ibmPlexSansArabic(
                             fontSize: 13.5,
@@ -451,14 +542,13 @@ class _MyListingsPageState extends State<MyListingsPage> {
                           ),
                         ),
                         const SizedBox(height: 18),
-                        FilledButton.icon(
-                          onPressed: _createListing,
-                          icon: const Icon(Icons.add),
-                          label: const Text('أضف خطك'),
+                        AddPartyCtas(
+                          onAddLine: _createListing,
+                          onAddRequest: _createRiderRequest,
                         ),
                       ] else ...[
                         Text(
-                          'خطوطك',
+                          'خطوطي',
                           style: GoogleFonts.ibmPlexSansArabic(
                             fontWeight: FontWeight.w700,
                             fontSize: 15,
@@ -470,12 +560,70 @@ class _MyListingsPageState extends State<MyListingsPage> {
                           _MyListingTile(
                             listing: _items[i],
                             onEdit: () => _edit(_items[i]),
+                            onRefresh: () => _refreshListing(_items[i]),
+                            onSaveCard: () => _saveCardImage(_items[i]),
                             onDelete: () => _delete(_items[i]),
-                            onPreview: _items[i].isPublished
-                                ? () => _previewInDirectory(_items[i])
-                                : null,
                           ),
                         ],
+                      ],
+                      if (!DirectoryLaunch.freeRiderContacts &&
+                          _unlocks.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        Text(
+                          'الطلبات التي فتحتها',
+                          style: GoogleFonts.ibmPlexSansArabic(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        for (final u in _unlocks) ...[
+                          InkWell(
+                            onTap: u.isApproved && u.request != null
+                                ? () => showRevealedRiderSheet(context, u.request!)
+                                : null,
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: c.riderAccent.withValues(alpha: 0.45),
+                              ),
+                              color: c.riderAccent.withValues(alpha: 0.08),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  u.request == null
+                                      ? 'طلب راكب'
+                                      : '${u.request!.area} ← ${u.request!.destination}',
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  u.isApproved
+                                      ? 'اضغط لفتح بطاقة الراكب وواتساب أو تلغرام'
+                                      : u.isPending
+                                          ? 'بانتظار تأكيد الدفع'
+                                          : 'مرفوض',
+                                  style: GoogleFonts.ibmPlexSansArabic(
+                                    fontSize: 13,
+                                    height: 1.4,
+                                    color: c.text.withValues(alpha: 0.78),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ),
+                        ],
+                      ],
                       ],
                     ],
                   ),
@@ -484,67 +632,136 @@ class _MyListingsPageState extends State<MyListingsPage> {
   }
 }
 
+class _AccountTab extends StatelessWidget {
+  const _AccountTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Material(
+      color: selected ? c.primary.withValues(alpha: 0.14) : Colors.transparent,
+      borderRadius: BorderRadius.circular(11),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(11),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 13,
+              color: selected ? c.primary : c.text.withValues(alpha: 0.75),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MatchRouteTile extends StatelessWidget {
+  const _MatchRouteTile({
+    required this.listing,
+    required this.count,
+    required this.onOpen,
+  });
+
+  final Listing listing;
+  final int count;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final kind = listing.isDriver ? 'خطك' : 'طلبك';
+    final other = listing.isDriver ? 'طلبات ركاب' : 'خطوط سائقين';
+    return Material(
+      color: c.surface,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: c.border),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$kind · $other',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 12,
+                        color: c.text.withValues(alpha: 0.58),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${listing.area} ← ${listing.destination}',
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      ListingRouteMatch.matchesCountLabel(count),
+                      style: GoogleFonts.ibmPlexSansArabic(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: count > 0 ? c.primary : c.text.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_left_rounded,
+                color: c.text.withValues(alpha: 0.45),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MyListingTile extends StatelessWidget {
   const _MyListingTile({
     required this.listing,
     required this.onEdit,
+    required this.onRefresh,
+    required this.onSaveCard,
     required this.onDelete,
-    this.onPreview,
   });
 
   final Listing listing;
   final VoidCallback onEdit;
+  final VoidCallback onRefresh;
+  final VoidCallback onSaveCard;
   final VoidCallback onDelete;
-  final VoidCallback? onPreview;
-
-  DateTime? get _publishedAt =>
-      listing.bumpedAt ?? listing.createdAt ?? listing.updatedAt;
-
-  String? get _dateLabel {
-    final at = _publishedAt?.toLocal();
-    if (at == null) return null;
-    return _relativeArabic(at);
-  }
-
-  String _relativeArabic(DateTime at) {
-    final diff = DateTime.now().difference(at);
-    if (diff.isNegative || diff.inSeconds < 45) return 'منذ لحظات';
-    if (diff.inMinutes < 60) {
-      final n = diff.inMinutes.clamp(1, 59);
-      return 'منذ ${_countLabel(n, 'دقيقة', 'دقيقتين', 'دقائق')}';
-    }
-    if (diff.inHours < 24) {
-      final n = diff.inHours.clamp(1, 23);
-      return 'منذ ${_countLabel(n, 'ساعة', 'ساعتين', 'ساعات')}';
-    }
-    if (diff.inDays < 7) {
-      final n = diff.inDays.clamp(1, 6);
-      return 'منذ ${_countLabel(n, 'يوم', 'يومين', 'أيام')}';
-    }
-    if (diff.inDays < 30) {
-      final n = (diff.inDays / 7).floor().clamp(1, 4);
-      return 'منذ ${_countLabel(n, 'أسبوع', 'أسبوعين', 'أسابيع')}';
-    }
-    if (diff.inDays < 365) {
-      final n = (diff.inDays / 30).floor().clamp(1, 11);
-      return 'منذ ${_countLabel(n, 'شهر', 'شهرين', 'أشهر')}';
-    }
-    final n = (diff.inDays / 365).floor().clamp(1, 99);
-    return 'منذ ${_countLabel(n, 'سنة', 'سنتين', 'سنوات')}';
-  }
-
-  String _countLabel(int n, String one, String two, String many) {
-    if (n == 1) return one;
-    if (n == 2) return two;
-    if (n >= 3 && n <= 10) return '$n $many';
-    return '$n $one';
-  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final accent = c.accent;
-    final dateLabel = _dateLabel;
 
     return Material(
       color: c.surface,
@@ -614,19 +831,17 @@ class _MyListingTile extends StatelessWidget {
                 color: c.text.withValues(alpha: 0.6),
               ),
             ),
-            if (dateLabel != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                dateLabel,
-                style: GoogleFonts.ibmPlexSansArabic(
-                  fontSize: 12,
-                  color: c.text.withValues(alpha: 0.55),
-                ),
+            const SizedBox(height: 4),
+            Text(
+              listing.lastUpdateLabel,
+              style: GoogleFonts.ibmPlexSansArabic(
+                fontSize: 12,
+                color: c.text.withValues(alpha: 0.55),
               ),
-            ],
+            ),
             if (listing.visibilityHint != null) ...[
               const SizedBox(height: 12),
-              _VisibilityAlert(message: listing.visibilityHint!, listing: listing),
+              _VisibilityAlert(message: listing.visibilityHint!),
             ],
             const SizedBox(height: 4),
             Row(
@@ -642,12 +857,16 @@ class _MyListingTile extends StatelessWidget {
                         icon: const Icon(Icons.edit_outlined, size: 18),
                         label: const Text('تعديل'),
                       ),
-                      if (onPreview != null)
-                        TextButton.icon(
-                          onPressed: onPreview,
-                          icon: const Icon(Icons.visibility_outlined, size: 18),
-                          label: const Text('معاينة في الدليل'),
-                        ),
+                      TextButton.icon(
+                        onPressed: onRefresh,
+                        icon: const Icon(Icons.update_rounded, size: 18),
+                        label: const Text('تحديث المنشور'),
+                      ),
+                      TextButton.icon(
+                        onPressed: onSaveCard,
+                        icon: const Icon(Icons.image_outlined, size: 18),
+                        label: const Text('حفظ صورة البطاقة'),
+                      ),
                     ],
                   ),
                 ),
@@ -671,23 +890,15 @@ class _MyListingTile extends StatelessWidget {
 class _VisibilityAlert extends StatelessWidget {
   const _VisibilityAlert({
     required this.message,
-    required this.listing,
   });
 
   final String message;
-  final Listing listing;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final urgent = listing.isExpired ||
-        (listing.isPublished && listing.wholeDaysLeft <= 7);
-    final tone = urgent ? Theme.of(context).colorScheme.error : c.primary;
-    final icon = listing.isExpired
-        ? Icons.event_busy_outlined
-        : urgent
-            ? Icons.notification_important_outlined
-            : Icons.schedule_outlined;
+    final tone = c.primary;
+    final icon = Icons.info_outline;
 
     return Container(
       width: double.infinity,
@@ -711,6 +922,69 @@ class _VisibilityAlert extends StatelessWidget {
                 color: c.text.withValues(alpha: 0.82),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GuestAccountPanel extends StatelessWidget {
+  const _GuestAccountPanel({
+    required this.onCreate,
+    required this.onBrowse,
+  });
+
+  final VoidCallback onCreate;
+  final VoidCallback onBrowse;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+      child: Column(
+        children: [
+          Icon(Icons.person_outline_rounded, size: 40, color: c.primary),
+          const SizedBox(height: 14),
+          Text(
+            'أنشئ حساباً لإدارة منشورك والرجوع إليه لاحقاً',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontWeight: FontWeight.w700,
+              fontSize: 17,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'التسجيل مطلوب فقط لإنشاء منشور أو تعديله. يمكنك متابعة التصفح بدون حساب.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.ibmPlexSansArabic(
+              height: 1.45,
+              color: c.text.withValues(alpha: 0.65),
+            ),
+          ),
+          const SizedBox(height: 22),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton(
+              onPressed: onCreate,
+              child: const Text('إنشاء حساب'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton(
+              onPressed: onCreate,
+              child: const Text('تسجيل دخول'),
+            ),
+          ),
+          TextButton(
+            onPressed: onBrowse,
+            child: const Text('العودة للتصفح'),
           ),
         ],
       ),

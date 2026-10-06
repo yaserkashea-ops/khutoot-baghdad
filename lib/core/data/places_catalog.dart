@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/filter_place_override.dart';
 import '../models/managed_place.dart';
 import '../../data/places_repository.dart';
+import '../config/preview_mode.dart';
 import 'baghdad_places.dart';
 
 /// Merges static Baghdad catalog with admin-managed places and overrides.
@@ -91,6 +92,11 @@ class PlacesCatalog extends ChangeNotifier {
   }
 
   Future<void> refresh({bool forAdmin = false}) async {
+    if (PreviewMode.enabled) {
+      _loaded = true;
+      _loading = false;
+      return;
+    }
     if (_loading) return;
     _loading = true;
     _error = null;
@@ -114,4 +120,4 @@ class PlacesCatalog extends ChangeNotifier {
     }
   }
 }
-
+

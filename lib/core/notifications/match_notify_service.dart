@@ -13,7 +13,7 @@ class MatchNotifyService {
   MatchNotifyService._();
   static final MatchNotifyService shared = MatchNotifyService._();
 
-  static const _pollInterval = Duration(minutes: 2);
+  static const _pollInterval = Duration(seconds: 25);
 
   Timer? _timer;
   bool _running = false;

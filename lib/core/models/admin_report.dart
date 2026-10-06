@@ -126,6 +126,7 @@ class AdminStats {
     this.desktopInstalls = 0,
     this.totalInstalls = 0,
     this.placesTotal = 0,
+    this.directoryUsers = 0,
   });
 
   final int listingsTotal;
@@ -142,4 +143,5 @@ class AdminStats {
   final int desktopInstalls;
   final int totalInstalls;
   final int placesTotal;
+  final int directoryUsers;
 }

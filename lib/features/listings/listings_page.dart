@@ -3,15 +3,23 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/activity/directory_activity.dart';
+import '../../core/auth/auth_gate_for_publishing.dart';
 import '../../core/auth/publisher_auth_controller.dart';
 import '../../core/bootstrap/app_bootstrap.dart';
 import '../../core/data/baghdad_places.dart';
 import '../../core/data/learned_places_store.dart';
 import '../../core/data/places_catalog.dart';
 import '../../core/models/listing.dart';
+import '../../core/config/directory_launch.dart';
+import '../../core/matches/listing_route_match.dart';
+import '../../core/config/unlock_payment.dart';
+import '../../core/models/contact_unlock.dart';
 import '../../core/notifications/match_notify_service.dart';
 import '../../core/notifications/notification_prefs.dart';
+import '../../core/notifications/notifications_bell_button.dart';
 import '../../core/notifications/publish_notify_service.dart';
+import '../../core/notifications/publisher_push_registrar.dart';
+import '../../core/notifications/unlock_notify_service.dart';
 import '../../core/pwa/app_install_tracker.dart';
 import '../../core/pwa/install_app_button.dart';
 import '../../core/pwa/pwa_install.dart';
@@ -19,20 +27,28 @@ import '../../core/pwa/share_app_button.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_toggle_button.dart';
 import '../../core/utils/listing_contact.dart';
+import '../../core/widgets/app_kit.dart';
+import '../../core/widgets/contact_options_sheet.dart';
+import '../../data/contact_unlocks_repository.dart';
 import '../../data/listings_repository.dart';
 import '../../data/publisher_repository.dart';
 import '../support/contact_admin_sheet.dart';
 import 'my_listings_page.dart';
 import 'publish_listing_page.dart';
-import 'publisher_auth_sheet.dart';
+import 'publish_rider_page.dart';
+import 'publish_role_sheet.dart';
 import 'widgets/empty_listings_state.dart';
+import 'directory_browse.dart';
+import 'directory_mode.dart';
 import 'widgets/filter_chips_bar.dart';
 import 'widgets/listing_card.dart';
+import 'widgets/rider_book_sheet.dart';
 
 class ListingsPage extends StatefulWidget {
-  const ListingsPage({super.key, this.repository});
+  const ListingsPage({super.key, this.repository, this.showFab = true});
 
   final ListingsRepository? repository;
+  final bool showFab;
 
   @override
   State<ListingsPage> createState() => _ListingsPageState();
@@ -46,11 +62,9 @@ class _ListingsPageState extends State<ListingsPage>
   List<Listing> _all = [];
   bool _loading = true;
   String? _loadError;
-  int _openCount = 0;
-
   String _areaQuery = '';
   String _destinationQuery = '';
-  String? _timeSlot; // صباحي | مسائي
+  String _timeSlot = 'صباحي';
   String? _gender;
   String _departureQuery = '';
   String _returnQuery = '';
@@ -58,6 +72,8 @@ class _ListingsPageState extends State<ListingsPage>
   final List<String> _pendingViewIds = <String>[];
   Timer? _viewFlushTimer;
   bool _showBackToTop = false;
+  bool _ridersTab = false;
+  Map<String, ContactUnlock> _unlocks = const {};
 
   @override
   void initState() {
@@ -70,7 +86,21 @@ class _ListingsPageState extends State<ListingsPage>
     unawaited(PlacesCatalog.shared.refresh());
     unawaited(_syncDirectoryActivity());
     unawaited(_resumePublisherNotifications());
+    DirectoryBrowse.query.addListener(_onBrowseIntent);
+    _applyBrowse(DirectoryBrowse.query.value);
     _load();
+  }
+
+  void _onBrowseIntent() => _applyBrowse(DirectoryBrowse.query.value);
+
+  void _applyBrowse(DirectoryBrowseQuery? q) {
+    if (q == null || !mounted) return;
+    setState(() {
+      _ridersTab = q.riders;
+      _areaQuery = q.area;
+      _destinationQuery = q.destination;
+      _timeSlot = (q.timeSlot == 'مسائي') ? 'مسائي' : 'صباحي';
+    });
   }
 
   Future<void> _resumePublisherNotifications() async {
@@ -82,6 +112,8 @@ class _ListingsPageState extends State<ListingsPage>
     if (!prefs.enabled) return;
     MatchNotifyService.shared.start();
     PublishNotifyService.shared.start();
+    UnlockNotifyService.shared.start();
+    unawaited(PublisherPushRegistrar.register());
   }
 
   void _onListScroll() {
@@ -101,15 +133,7 @@ class _ListingsPageState extends State<ListingsPage>
   }
 
   Future<void> _syncDirectoryActivity() async {
-    final cached = await DirectoryActivity.loadCachedCount();
-    if (mounted && cached > 0) {
-      setState(() => _openCount = cached);
-    }
-    final n = await DirectoryActivity.syncOnLaunch();
-    if (!mounted) return;
-    if (n != _openCount) {
-      setState(() => _openCount = n);
-    }
+    await DirectoryActivity.syncOnLaunch();
   }
 
   @override
@@ -118,6 +142,7 @@ class _ListingsPageState extends State<ListingsPage>
     unawaited(_flushPendingViews());
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.removeListener(_onListScroll);
+    DirectoryBrowse.query.removeListener(_onBrowseIntent);
     _scrollController.dispose();
     super.dispose();
   }
@@ -149,6 +174,9 @@ class _ListingsPageState extends State<ListingsPage>
         _all = results[0] as List<Listing>;
         _loading = false;
       });
+      if (!DirectoryLaunch.freeRiderContacts) {
+        unawaited(_loadUnlocks());
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -164,15 +192,22 @@ class _ListingsPageState extends State<ListingsPage>
     final depQ = _departureQuery.trim();
     final retQ = _returnQuery.trim();
     final list = _all.where((l) {
-      // Directory shows driver routes only (legacy rider posts stay in DB/admin).
-      if (!l.isDriver) return false;
-      if (areaQ.isNotEmpty && !_matchesPlace(l, areaQ, preferArea: true)) {
+      if (_ridersTab) {
+        if (l.isDriver) return false;
+      } else {
+        if (!l.isDriver) return false;
+      }
+      if (areaQ.isNotEmpty &&
+          !ListingRouteMatch.matchesOriginQuery(l, areaQ)) {
         return false;
       }
-      if (destQ.isNotEmpty && !_matchesPlace(l, destQ, preferArea: false)) {
+      if (destQ.isNotEmpty &&
+          !ListingRouteMatch.matchesDestinationQuery(l, destQ)) {
         return false;
       }
-      if (_timeSlot != null && l.timePeriodLabel != _timeSlot) return false;
+      if (l.timePeriodLabel != _timeSlot) {
+        return false;
+      }
       if (_gender != null && _genderKey(l) != _gender) return false;
       if (depQ.isNotEmpty) {
         final dep = l.departureTime?.trim() ?? '';
@@ -192,12 +227,17 @@ class _ListingsPageState extends State<ListingsPage>
     return list;
   }
 
+  bool get _incompletePlaceSearch {
+    final a = _areaQuery.trim().isNotEmpty;
+    final d = _destinationQuery.trim().isNotEmpty;
+    return a != d;
+  }
+
   bool get _hasPlaceSearch =>
       _areaQuery.trim().isNotEmpty || _destinationQuery.trim().isNotEmpty;
 
   bool get _hasAnyFilter =>
       _hasPlaceSearch ||
-      _timeSlot != null ||
       _gender != null ||
       _departureQuery.trim().isNotEmpty ||
       _returnQuery.trim().isNotEmpty;
@@ -206,12 +246,7 @@ class _ListingsPageState extends State<ListingsPage>
   List<String> get _originSearchPlaces {
     final out = <String>{};
     for (final l in _all) {
-      final area = l.area.trim();
-      if (area.isNotEmpty) out.add(area);
-      for (final s in l.originSubs) {
-        final t = s.trim();
-        if (t.isNotEmpty) out.add(t);
-      }
+      out.addAll(ListingRouteMatch.originPlaces(l));
     }
     return out.toList();
   }
@@ -220,24 +255,9 @@ class _ListingsPageState extends State<ListingsPage>
   List<String> get _destinationSearchPlaces {
     final out = <String>{};
     for (final l in _all) {
-      final dest = l.destination.trim();
-      if (dest.isNotEmpty) out.add(dest);
-      for (final s in l.destinationSubs) {
-        final t = s.trim();
-        if (t.isNotEmpty) out.add(t);
-      }
+      out.addAll(ListingRouteMatch.destinationPlaces(l));
     }
     return out.toList();
-  }
-
-  /// Match main place or any nested sub-point on that side of the route.
-  bool _matchesPlace(Listing l, String query, {required bool preferArea}) {
-    final places = preferArea
-        ? <String>[l.area, ...l.originSubs]
-        : <String>[l.destination, ...l.destinationSubs];
-    return places.any(
-      (p) => p.trim().isNotEmpty && BaghdadPlaces.matchesQuery(p, query),
-    );
   }
 
   String _genderKey(Listing l) => switch (l.genderRequirement) {
@@ -248,120 +268,46 @@ class _ListingsPageState extends State<ListingsPage>
 
   static const _timeSlots = <String>['صباحي', 'مسائي'];
 
-  String? _resultsStatus(int count) {
-    if (_loadError != null) return 'تعذر تحميل النتائج';
-    if (count == 0) {
-      return _hasAnyFilter ? 'لم نجد خطوطاً مطابقة' : null;
-    }
-    return '$count خطاً متاحاً';
-  }
-
-  Future<void> _openMyListings() async {
-    final auth = PublisherAuthController.shared;
-    if (!auth.isLoaded) await auth.load();
-    if (!mounted) return;
-
-    if (!auth.isLoggedIn) {
-      final ok = await showPublisherAuthSheet(context);
-      if (!mounted) return;
-      if (!ok || !PublisherAuthController.shared.isLoggedIn) return;
-    }
-
+  Future<void> _openMyListings({bool blocking = false}) async {
     if (!mounted) return;
     await Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => const MyListingsPage()),
+      MaterialPageRoute(
+        builder: (_) => MyListingsPage(
+          onBrowse: () => Navigator.of(context).maybePop(),
+        ),
+      ),
     );
     if (mounted) setState(() {});
   }
 
-  Future<void> _openMainAction() async {
-    final auth = PublisherAuthController.shared;
-    if (!auth.isLoaded) await auth.load();
+  Future<void> _openPublish({required bool asRider}) async {
+    if (!await AuthGateForPublishing.ensure(context, asRider: asRider)) return;
     if (!mounted) return;
-
-    if (auth.isLoggedIn) {
-      await _openMyListings();
-      return;
-    }
-
-    final c = context.colors;
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: c.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    if (!await confirmPublishLane(context, asRider: asRider)) return;
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => asRider
+            ? const PublishRiderPage()
+            : PublishListingPage(
+                repository: ListingsRepository.shared,
+                initialType: ListingType.driver,
+                asDirectoryRequest: true,
+              ),
       ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'أنت سائق؟',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'لإضافة خطك إلى الدليل يلزم إنشاء حساب أو تسجيل الدخول أولاً.',
-                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                        color: c.text.withValues(alpha: 0.6),
-                      ),
-                ),
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  onPressed: () => Navigator.pop(ctx, 'request'),
-                  icon: const Icon(Icons.route_outlined),
-                  label: const Text('إنشاء حساب وإضافة خط'),
-                ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.pop(ctx, 'account'),
-                  icon: const Icon(Icons.login_rounded),
-                  label: const Text('لدي حساب — تسجيل الدخول'),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
-    if (!mounted || choice == null) return;
-    if (choice == 'account') {
-      await _openMyListings();
-      return;
-    }
-    await _startPublishFlow();
+    if (mounted) unawaited(_load());
   }
 
-  Future<void> _startPublishFlow() async {
-    final auth = PublisherAuthController.shared;
-    if (!auth.isLoaded) await auth.load();
-    if (!mounted) return;
-    if (!auth.isLoggedIn) {
-      final ok = await showPublisherAuthSheet(
-        context,
-        title: 'إنشاء حساب مطلوب لإضافة خطك',
-      );
+  Future<void> _loadUnlocks() async {
+    if (DirectoryLaunch.freeRiderContacts) return;
+    try {
+      final rows = await ContactUnlocksRepository.shared.mine();
       if (!mounted) return;
-      if (!ok || !PublisherAuthController.shared.isLoggedIn) return;
-    }
-
-    final saved = await Navigator.of(context).push<Listing>(
-      MaterialPageRoute(
-        builder: (_) => PublishListingPage(
-          repository: _repository,
-          initialType: ListingType.driver,
-          asDirectoryRequest: true,
-        ),
-      ),
-    );
-    if (!mounted || saved == null) return;
-    await _load();
+      setState(() {
+        _unlocks = {for (final u in rows) u.riderRequestId: u};
+      });
+    } catch (_) {}
   }
 
   /// Every time a card enters the list viewport (including re-appear on scroll),
@@ -382,7 +328,30 @@ class _ListingsPageState extends State<ListingsPage>
     await PublisherRepository.shared.incrementViewsMany(batch);
   }
 
+  Future<void> _onRiderContact(Listing listing) async {
+    final existing = _unlocks[listing.id];
+    final updated = await openRiderBooking(
+      context,
+      listing: listing,
+      existing: existing,
+    );
+    if (!mounted || updated == null) return;
+    setState(() {
+      _unlocks = {..._unlocks, listing.id: updated};
+      if (updated.isPending || updated.isApproved) {
+        _all = [
+          for (final l in _all)
+            l.id == listing.id ? l.copyWith(isBooked: true) : l,
+        ];
+      }
+    });
+  }
+
   Future<void> _onContact(Listing listing) async {
+    if (!listing.isDriver && !DirectoryLaunch.freeRiderContacts) {
+      await _onRiderContact(listing);
+      return;
+    }
     final options = ListingContact.optionsFor(listing);
     if (!mounted) return;
     if (options.isEmpty) {
@@ -400,64 +369,10 @@ class _ListingsPageState extends State<ListingsPage>
       return;
     }
 
-    final c = context.colors;
-    final chosen = await showModalBottomSheet<ContactOption>(
-      context: context,
-      backgroundColor: c.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'اختر وسيلة التواصل',
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 12),
-                for (final option in options) ...[
-                  ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: c.border),
-                    ),
-                    title: Row(
-                      children: [
-                        Text(option.label),
-                        if (option.detail != null &&
-                            option.detail!.trim().isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: SelectableText(
-                              option.detail!,
-                              maxLines: 1,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                                color: c.text.withValues(alpha: 0.75),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    trailing: const Icon(Icons.chevron_left),
-                    onTap: () => Navigator.pop(ctx, option),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
+    final chosen = await showContactOptionsSheet(
+      context,
+      title: listing.isDriver ? 'تواصل مع السائق' : 'تواصل مع الراكب',
+      options: options,
     );
     if (chosen == null) return;
     await ListingContact.openUrl(chosen.url);
@@ -466,7 +381,7 @@ class _ListingsPageState extends State<ListingsPage>
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final filtered = _filtered;
+    final filtered = _incompletePlaceSearch ? const <Listing>[] : _filtered;
 
     return Scaffold(
       appBar: AppBar(
@@ -485,17 +400,7 @@ class _ListingsPageState extends State<ListingsPage>
                 ),
           ),
         ),
-        leadingWidth: _openCount > 0 ? 156 : 56,
-        leading: _openCount > 0
-            ? Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 6),
-                  child: _DirectoryUsersChip(count: _openCount),
-                ),
-              )
-            : null,
-        actionsPadding: EdgeInsets.zero,
+        actionsPadding: const EdgeInsetsDirectional.only(end: 2),
         actions: [
           IconButtonTheme(
             data: IconButtonThemeData(
@@ -512,6 +417,7 @@ class _ListingsPageState extends State<ListingsPage>
                 ShareAppIconButton(),
                 InstallAppIconButton(),
                 ThemeToggleButton(),
+                NotificationsBellButton(),
               ],
             ),
           ),
@@ -549,41 +455,25 @@ class _ListingsPageState extends State<ListingsPage>
               ),
             ),
           ),
-          ListenableBuilder(
+          if (widget.showFab)
+            ListenableBuilder(
             listenable: PublisherAuthController.shared,
             builder: (context, _) {
-              final loggedIn = PublisherAuthController.shared.isLoggedIn;
-              final label = loggedIn ? 'حسابي' : 'أضف خطك';
+              final inAccount = PublisherAuthController.shared.isLoggedIn;
               return FloatingActionButton.extended(
-                onPressed: loggedIn ? _openMyListings : _openMainAction,
-                tooltip: label,
+                onPressed: () => _openMyListings(blocking: !inAccount),
+                tooltip: inAccount ? 'حسابي' : 'اضافة',
                 icon: Icon(
-                  loggedIn
-                      ? Icons.person_outline_rounded
-                      : Icons.route_outlined,
+                  inAccount ? Icons.person_rounded : Icons.add_rounded,
                 ),
-                label: Text(label),
+                label: Text(inAccount ? 'حسابي' : 'اضافة'),
               );
             },
           ),
         ],
       ),
       body: _loading
-          ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(color: c.primary),
-                  const SizedBox(height: 14),
-                  Text(
-                    'جاري تحميل الخطوط…',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: c.text.withValues(alpha: 0.65),
-                        ),
-                  ),
-                ],
-              ),
-            )
+          ? const LoadingSkeleton(lines: 5)
           : SafeArea(
               top: false,
               child: Align(
@@ -591,7 +481,7 @@ class _ListingsPageState extends State<ListingsPage>
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 720),
                   child: RefreshIndicator(
-                    color: c.primary,
+                    color: DirectoryMode(riders: _ridersTab).accent(c),
                     onRefresh: _load,
                     child: CustomScrollView(
                       controller: _scrollController,
@@ -616,6 +506,16 @@ class _ListingsPageState extends State<ListingsPage>
                               extraAreaOptions: _originSearchPlaces,
                               extraDestinationOptions:
                                   _destinationSearchPlaces,
+                              ridersTab: _ridersTab,
+                              onRidersTabChanged: (v) =>
+                                  setState(() => _ridersTab = v),
+                              onShowResults: () {
+                                _scrollController.animateTo(
+                                  280,
+                                  duration: const Duration(milliseconds: 280),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              },
                               onAreaQueryChanged: (v) =>
                                   setState(() => _areaQuery = v),
                               onDestinationQueryChanged: (v) =>
@@ -646,60 +546,13 @@ class _ListingsPageState extends State<ListingsPage>
                             ),
                           ),
                         ),
-                        SliverToBoxAdapter(
-                          child: Builder(
-                            builder: (context) {
-                              final status = _resultsStatus(filtered.length);
-                              if (status == null) {
-                                return const SizedBox(height: 6);
-                              }
-                              final showActiveDot = filtered.isNotEmpty &&
-                                  _loadError == null;
-                              return Padding(
-                                padding: const EdgeInsetsDirectional.fromSTEB(
-                                  16,
-                                  8,
-                                  16,
-                                  10,
-                                ),
-                                child: Row(
-                                  children: [
-                                    if (showActiveDot) ...[
-                                      Container(
-                                        width: 7,
-                                        height: 7,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFF22C55E),
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                    ],
-                                    Flexible(
-                                      child: Text(
-                                        status,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleSmall
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w600,
-                                              color: c.text
-                                                  .withValues(alpha: 0.78),
-                                            ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
                         if (_loadError != null)
                           SliverFillRemaining(
                             hasScrollBody: false,
                             child: EmptyListingsState(
                               kind: EmptyListingsKind.error,
-                              onPublish: _openMainAction,
+                              forRiders: _ridersTab,
+                              onPublish: () => _openMyListings(blocking: true),
                               onRetry: _load,
                             ),
                           )
@@ -707,10 +560,16 @@ class _ListingsPageState extends State<ListingsPage>
                           SliverFillRemaining(
                             hasScrollBody: false,
                             child: EmptyListingsState(
-                              kind: _hasAnyFilter
+                              kind: _incompletePlaceSearch
+                                  ? EmptyListingsKind.incompleteSearch
+                                  : _hasAnyFilter
                                   ? EmptyListingsKind.noMatch
                                   : EmptyListingsKind.promptSearch,
-                              onPublish: _openMainAction,
+                              forRiders: _ridersTab,
+                              onPublish: () => _openMyListings(blocking: true),
+                              onAdjustSearch: () => _scrollToTop(),
+                              onInvite: () =>
+                                  _openPublish(asRider: !_ridersTab),
                             ),
                           )
                         else ...[
@@ -727,32 +586,40 @@ class _ListingsPageState extends State<ListingsPage>
                                   const SizedBox(height: 10),
                               itemBuilder: (context, index) {
                                 final listing = filtered[index];
+                                final unlock = _unlocks[listing.id];
+                                final revealed =
+                                    unlock != null && unlock.isApproved;
+                                final pending =
+                                    unlock != null && unlock.isPending;
                                 return _ImpressionProbe(
                                   key: ValueKey('view-${listing.id}'),
                                   listing: listing,
                                   onAppear: _onCardAppeared,
                                   child: ListingCard(
-                                    listing: listing,
+                                    listing: DirectoryLaunch.freeRiderContacts ||
+                                            revealed ||
+                                            listing.isDriver
+                                        ? listing
+                                        : listing.withoutPublicContacts(),
                                     onContact: () => _onContact(listing),
+                                    revealPending:
+                                        DirectoryLaunch.freeRiderContacts
+                                            ? false
+                                            : pending,
+                                    contactRevealed:
+                                        DirectoryLaunch.freeRiderContacts ||
+                                            revealed,
+                                    contactLabel: listing.isDriver ||
+                                            DirectoryLaunch.freeRiderContacts
+                                        ? null
+                                        : (revealed
+                                            ? 'تواصل مع الراكب'
+                                            : UnlockPayment.bookAction),
                                   ),
                                 );
                               },
                             ),
                           ),
-                          if (filtered.length < 6)
-                            SliverToBoxAdapter(
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  20,
-                                  16,
-                                  8,
-                                ),
-                                child: _LowResultsCta(
-                                  onPublish: _openMainAction,
-                                ),
-                              ),
-                            ),
                           const SliverToBoxAdapter(
                             child: SizedBox(height: 96),
                           ),
@@ -805,71 +672,6 @@ class _BackToTopButton extends StatelessWidget {
   }
 }
 
-class _DirectoryUsersChip extends StatelessWidget {
-  const _DirectoryUsersChip({required this.count});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: c.text.withValues(alpha: 0.82),
-          height: 1.05,
-        );
-    return Semantics(
-      label: DirectoryActivity.labelFor(count),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: (isDark ? Colors.white : c.primary).withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: c.border.withValues(alpha: isDark ? 0.4 : 0.65),
-          ),
-        ),
-        // RTL: first child is on the right.
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.people,
-              size: 15,
-              color: c.primary,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              DirectoryActivity.formatCount(count),
-              maxLines: 1,
-              softWrap: false,
-              style: labelStyle,
-            ),
-            const SizedBox(width: 5),
-            Container(
-              width: 7,
-              height: 7,
-              decoration: const BoxDecoration(
-                color: Color(0xFF22C55E),
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              'مستخدم',
-              maxLines: 1,
-              softWrap: false,
-              style: labelStyle?.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// Fires [onAppear] when the card enters the scroll cache / viewport, and again
 /// after it was disposed (scrolled away) and rebuilt — so repeated scroll-ins count.
 class _ImpressionProbe extends StatefulWidget {
@@ -905,45 +707,4 @@ class _ImpressionProbeState extends State<_ImpressionProbe> {
 
   @override
   Widget build(BuildContext context) => widget.child;
-}
-
-class _LowResultsCta extends StatelessWidget {
-  const _LowResultsCta({required this.onPublish});
-
-  final VoidCallback onPublish;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: c.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'سائق؟ انشر خطك في الدليل ليصل إليك الركاب بسهولة.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    height: 1.45,
-                    color: c.text.withValues(alpha: 0.78),
-                  ),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: onPublish,
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(46),
-              ),
-              child: const Text('أضف خطك'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

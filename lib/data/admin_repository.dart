@@ -1,6 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/activity/directory_activity.dart';
 import '../core/config/admin_contact.dart';
+import '../core/config/preview_mode.dart';
 import '../core/data/places_catalog.dart';
 import '../core/data/supabase_mappers.dart';
 import '../core/models/admin_report.dart';
@@ -47,6 +49,7 @@ class AdminRepository {
     required ListingsRepository listings,
     required SupabaseClient client,
   }) {
+    if (PreviewMode.enabled) return;
     shared = AdminRepository(listings: listings, client: client);
   }
 
@@ -260,6 +263,10 @@ class AdminRepository {
         // RPC may not exist until migrate_app_installs.sql is applied.
       }
       final placesTotal = await _countAdminPlaces();
+      var directoryUsers = DirectoryActivity.progressFloor;
+      try {
+        directoryUsers = await DirectoryActivity.fetchCount();
+      } catch (_) {}
       return AdminStats(
         listingsTotal: await listings.countLiveDirectory(),
         drivers: await listings.countDrivers(),
@@ -275,6 +282,7 @@ class AdminRepository {
         desktopInstalls: desktopInstalls,
         totalInstalls: totalInstalls,
         placesTotal: placesTotal,
+        directoryUsers: directoryUsers,
       );
     }
     await Future<void>.delayed(const Duration(milliseconds: 30));
@@ -291,6 +299,7 @@ class AdminRepository {
       outreachFresh: fresh,
       outreachTotal: _localLeads.length,
       placesTotal: await _countAdminPlaces(),
+      directoryUsers: DirectoryActivity.progressFloor,
     );
   }
 

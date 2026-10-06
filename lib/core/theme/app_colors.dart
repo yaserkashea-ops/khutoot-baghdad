@@ -11,6 +11,8 @@ class MasaratColors extends ThemeExtension<MasaratColors> {
     required this.onPrimary,
     required this.accent,
     required this.riderAccent,
+    required this.opportunity,
+    required this.wanted,
     required this.border,
   });
 
@@ -21,6 +23,10 @@ class MasaratColors extends ThemeExtension<MasaratColors> {
   final Color onPrimary;
   final Color accent;
   final Color riderAccent;
+  /// Rider lane — forest sibling of brand teal.
+  final Color opportunity;
+  /// Wanted listing — dusk slate, quiet against driver teal.
+  final Color wanted;
   final Color border;
 
   /// Day — deep teal frame / gold accent from icon.
@@ -32,6 +38,8 @@ class MasaratColors extends ThemeExtension<MasaratColors> {
     onPrimary: Color(0xFFF4F8F7),
     accent: Color(0xFFC5A059),
     riderAccent: Color(0xFFB5623F),
+    opportunity: Color(0xFF146B5A),
+    wanted: Color(0xFF4A6570),
     border: Color(0xFFD5E2E0),
   );
 
@@ -44,6 +52,8 @@ class MasaratColors extends ThemeExtension<MasaratColors> {
     onPrimary: Color(0xFF02130D),
     accent: Color(0xFFD4AF37),
     riderAccent: Color(0xFFC97B5C),
+    opportunity: Color(0xFF5FCBB0),
+    wanted: Color(0xFF9BB0B6),
     border: Color(0xFF1A3532),
   );
 
@@ -56,6 +66,8 @@ class MasaratColors extends ThemeExtension<MasaratColors> {
     Color? onPrimary,
     Color? accent,
     Color? riderAccent,
+    Color? opportunity,
+    Color? wanted,
     Color? border,
   }) {
     return MasaratColors(
@@ -66,6 +78,8 @@ class MasaratColors extends ThemeExtension<MasaratColors> {
       onPrimary: onPrimary ?? this.onPrimary,
       accent: accent ?? this.accent,
       riderAccent: riderAccent ?? this.riderAccent,
+      opportunity: opportunity ?? this.opportunity,
+      wanted: wanted ?? this.wanted,
       border: border ?? this.border,
     );
   }
@@ -81,6 +95,8 @@ class MasaratColors extends ThemeExtension<MasaratColors> {
       onPrimary: Color.lerp(onPrimary, other.onPrimary, t)!,
       accent: Color.lerp(accent, other.accent, t)!,
       riderAccent: Color.lerp(riderAccent, other.riderAccent, t)!,
+      opportunity: Color.lerp(opportunity, other.opportunity, t)!,
+      wanted: Color.lerp(wanted, other.wanted, t)!,
       border: Color.lerp(border, other.border, t)!,
     );
   }
@@ -98,6 +114,8 @@ abstract final class AppColors {
   static const Color text = Color(0xFF102221);
   static const Color accent = Color(0xFFC5A059);
   static const Color riderAccent = Color(0xFFB5623F);
+  static const Color opportunity = Color(0xFF146B5A);
+  static const Color wanted = Color(0xFF4A6570);
   static const Color border = Color(0xFFD5E2E0);
 }
 

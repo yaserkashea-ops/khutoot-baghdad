@@ -17,6 +17,7 @@ class PlaceOptionsMenuController {
   ScrollController? _scrollController;
   bool _showAll = true;
   bool _framePinned = false;
+  bool _commitOnDown = false;
   Rect? _lastRect;
 
   List<String> Function()? _optionsOf;
@@ -112,6 +113,7 @@ class PlaceOptionsMenuController {
     }
     close();
     _showAll = showAll;
+    _commitOnDown = !showAll;
     _maxHeight = maxHeight;
     _optionsOf = optionsOf;
     _queryOf = queryOf;
@@ -175,8 +177,8 @@ class PlaceOptionsMenuController {
   void _pick(String option) {
     final onSelected = _onSelected;
     final onChanged = _onChanged;
-    // Call selection BEFORE removing the overlay — removing mid-gesture
-    // can cancel InkWell onTap on Flutter web.
+    // Keep callbacks until after selection — overlay removal used to
+    // cancel the web pointer-up before the field could commit.
     onSelected?.call(option);
     close();
     onChanged?.call();
@@ -259,6 +261,7 @@ class PlaceOptionsMenuController {
                       emphasize: isLeading || isTrailing,
                       emphasizeColor: c.primary,
                       textColor: c.text,
+                      commitOnDown: _commitOnDown,
                       onArm: () => _onArmSelect?.call(option),
                       onCancelArm: () => _onCancelArm?.call(),
                       onPick: () => _pick(option),
@@ -328,6 +331,7 @@ class _PlaceOptionTile extends StatefulWidget {
     required this.emphasize,
     required this.emphasizeColor,
     required this.textColor,
+    this.commitOnDown = false,
   });
 
   final String label;
@@ -337,6 +341,7 @@ class _PlaceOptionTile extends StatefulWidget {
   final bool emphasize;
   final Color emphasizeColor;
   final Color textColor;
+  final bool commitOnDown;
 
   @override
   State<_PlaceOptionTile> createState() => _PlaceOptionTileState();
@@ -366,10 +371,16 @@ class _PlaceOptionTileState extends State<_PlaceOptionTile> {
           _moved = false;
           _picked = false;
           _armed = true;
-          // Apply the suggestion immediately — before focus/IME can lock the prefix.
           widget.onArm();
+          // Typeahead: commit on down so the tap is not stolen by the
+          // filter field / dropdown behind the overlay.
+          if (widget.commitOnDown && !_picked) {
+            _picked = true;
+            widget.onPick();
+          }
         },
         onPointerMove: (e) {
+          if (_picked) return;
           final start = _down;
           if (start == null || _moved) return;
           if ((e.position - start).distance > _tapSlop) {
@@ -381,19 +392,23 @@ class _PlaceOptionTileState extends State<_PlaceOptionTile> {
           }
         },
         onPointerUp: (e) {
+          if (_picked) {
+            _reset();
+            return;
+          }
           final start = _down;
           final wasTap = start != null &&
               !_moved &&
               (e.position - start).distance <= _tapSlop;
           final shouldPick = wasTap && _armed && !_picked;
-          _reset();
           if (shouldPick) {
             _picked = true;
             widget.onPick();
           }
+          _reset();
         },
         onPointerCancel: (_) {
-          if (_armed) widget.onCancelArm();
+          if (!_picked && _armed) widget.onCancelArm();
           _reset();
         },
         child: Padding(

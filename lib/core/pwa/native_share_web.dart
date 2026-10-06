@@ -1,4 +1,5 @@
 import 'dart:js_interop';
+import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
@@ -28,7 +29,6 @@ abstract final class NativeShare {
         return NativeShareOutcome.shared;
       }
 
-      // Some agents accept text only (URL embedded).
       final textOnly = web.ShareData(
         title: title,
         text: '$text\n$url',
@@ -40,7 +40,55 @@ abstract final class NativeShare {
 
       return NativeShareOutcome.unavailable;
     } catch (error) {
-      // User closed the system sheet without sharing.
+      if (error.toString().contains('AbortError')) {
+        return NativeShareOutcome.dismissed;
+      }
+      return NativeShareOutcome.unavailable;
+    }
+  }
+
+  /// Shares a PNG via the OS sheet (Save image / Gallery / WhatsApp…).
+  ///
+  /// [filename] must be ASCII — Arabic names break file share on Android.
+  static Future<NativeShareOutcome> shareImage({
+    required List<int> bytes,
+    required String filename,
+    required String title,
+    String? text,
+  }) async {
+    try {
+      final data = Uint8List.fromList(bytes);
+      final blob = web.Blob(
+        [data.toJS].toJS,
+        web.BlobPropertyBag(type: 'image/png'),
+      );
+      final safeName = filename.endsWith('.png') ? filename : '$filename.png';
+      final file = web.File(
+        [blob].toJS,
+        safeName,
+        web.FilePropertyBag(type: 'image/png'),
+      );
+      final files = [file].toJS;
+
+      // Files-only → mobile OS shows «Save image» / Studio prominently.
+      final filesOnly = web.ShareData(files: files);
+      if (_canShare(filesOnly)) {
+        await web.window.navigator.share(filesOnly).toDart;
+        return NativeShareOutcome.shared;
+      }
+
+      final withMeta = web.ShareData(
+        files: files,
+        title: title,
+        text: text ?? title,
+      );
+      if (_canShare(withMeta)) {
+        await web.window.navigator.share(withMeta).toDart;
+        return NativeShareOutcome.shared;
+      }
+
+      return NativeShareOutcome.unavailable;
+    } catch (error) {
       if (error.toString().contains('AbortError')) {
         return NativeShareOutcome.dismissed;
       }

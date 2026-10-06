@@ -30,13 +30,13 @@ class AdminShellPage extends StatefulWidget {
 }
 
 class _AdminShellPageState extends State<AdminShellPage> {
-  /// Full page index (0–10). Bottom bar shows only 0–3 + «المزيد».
+  /// Full page index. Bottom bar: عامة، طلبات، إعلانات، المزيد.
   int _index = 0;
 
   static const _titles = [
     'نظرة عامة',
-    'طلبات الدليل',
-    'الاشتراكات',
+    'مراجعة المنشورات',
+    'متابعة المنشورات',
     'الإعلانات',
     'جهات المنشورات',
     'المكرر',
@@ -47,9 +47,13 @@ class _AdminShellPageState extends State<AdminShellPage> {
     'الإعدادات',
   ];
 
-  static const _primaryCount = 4;
+  static const _primaryCount = 3;
 
-  int get _navIndex => _index < _primaryCount ? _index : _primaryCount;
+  int get _navIndex {
+    if (_index < 2) return _index;
+    if (_index == 3) return 2;
+    return _primaryCount;
+  }
 
   @override
   void initState() {
@@ -123,6 +127,13 @@ class _AdminShellPageState extends State<AdminShellPage> {
                   title: 'التشغيل',
                   children: [
                     _MoreItem(
+                      icon: Icons.event_available_outlined,
+                      title: 'متابعة المنشورات',
+                    subtitle: 'آخر تحديث، إخفاء، حذف',
+                      pageIndex: 2,
+                      selected: _index == 2,
+                    ),
+                    _MoreItem(
                       icon: Icons.contacts_outlined,
                       title: 'جهات المنشورات',
                       subtitle: 'أرقام ويوزرات الخطوط المنشورة',
@@ -189,11 +200,16 @@ class _AdminShellPageState extends State<AdminShellPage> {
   }
 
   void _onNavSelected(int navIndex) {
-    if (navIndex < _primaryCount) {
-      _openTab(navIndex);
-      return;
+    switch (navIndex) {
+      case 0:
+        _openTab(0);
+      case 1:
+        _openTab(1);
+      case 2:
+        _openTab(3);
+      default:
+        unawaited(_openMoreMenu());
     }
-    unawaited(_openMoreMenu());
   }
 
   @override
@@ -251,12 +267,7 @@ class _AdminShellPageState extends State<AdminShellPage> {
           NavigationDestination(
             icon: const Icon(Icons.inbox_outlined),
             selectedIcon: Icon(Icons.inbox, color: c.primary),
-            label: 'طلبات',
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.event_available_outlined),
-            selectedIcon: Icon(Icons.event_available, color: c.primary),
-            label: 'اشتراكات',
+            label: 'مراجعة',
           ),
           NavigationDestination(
             icon: const Icon(Icons.list_alt_outlined),

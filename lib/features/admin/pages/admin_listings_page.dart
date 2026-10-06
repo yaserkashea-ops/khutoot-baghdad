@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/models/listing.dart';
+import '../../../core/config/directory_launch.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/contact_unlocks_repository.dart';
 import '../../../data/listings_repository.dart';
-import '../../listings/publish_listing_page.dart';
+import '../widgets/admin_double_confirm.dart';
+import '../widgets/admin_publish_flow.dart';
+import '../widgets/share_listing_card_sheet.dart';
+import 'admin_listing_review_page.dart';
 
 class AdminListingsPage extends StatefulWidget {
   const AdminListingsPage({super.key});
@@ -17,6 +22,7 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
   final _search = TextEditingController();
   List<Listing> _items = [];
   bool _loading = true;
+  bool _ridersLane = false;
 
   @override
   void initState() {
@@ -43,6 +49,7 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
   List<Listing> get _filtered {
     final q = _search.text.trim();
     return _items.where((l) {
+      if (l.isDriver == _ridersLane) return false;
       if (q.isEmpty) return true;
       final blob = [
         l.area,
@@ -101,35 +108,60 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
   }
 
   Future<void> _edit(Listing listing) async {
-    final saved = await Navigator.of(context).push<Listing>(
-      MaterialPageRoute(
-        builder: (_) => PublishListingPage(
-          repository: ListingsRepository.shared,
-          initial: listing,
-          allowFreeTextPlaces: true,
-        ),
-      ),
-    );
+    final saved = await openAdminListingReview(context, listing);
     if (saved != null) await _load();
   }
 
-  Future<void> _publishManual() async {
-    final saved = await Navigator.of(context).push<Listing>(
-      MaterialPageRoute(
-        builder: (_) => PublishListingPage(
-          repository: ListingsRepository.shared,
-          initialType: ListingType.driver,
-          allowFreeTextPlaces: true,
+  Future<void> _unbook(Listing listing) async {
+    final ok = await AdminDoubleConfirm.show(
+      context,
+      title: 'إزالة الحجز؟',
+      detail: 'يُزال وسم محجوز فوراً ويُعاد نشر الطلب في الدليل ليصبح متاحاً للحجز.',
+      confirmLabel: 'تأكيد الإزالة',
+    );
+    if (!ok || !mounted) return;
+    setState(() {
+      _items = [
+        for (final l in _items)
+          l.id == listing.id ? l.copyWith(isBooked: false) : l,
+      ];
+    });
+    try {
+      await ContactUnlocksRepository.shared.releaseActiveForRequest(listing.id);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'تعذر إزالة الحجز. أعد المحاولة.',
+            style: GoogleFonts.ibmPlexSansArabic(),
+          ),
+        ),
+      );
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          'أُزيل الحجز وأُعيد نشر الطلب',
+          style: GoogleFonts.ibmPlexSansArabic(),
         ),
       ),
     );
+    await _load();
+  }
+
+  Future<void> _publishManual() async {
+    final saved = await openAdminPublishFlow(context);
     if (!mounted) return;
     if (saved != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
           content: Text(
-            'تم نشر الخط في الدليل',
+            'تم نشر الإعلان في الدليل',
             style: GoogleFonts.ibmPlexSansArabic(),
           ),
         ),
@@ -146,9 +178,9 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _publishManual,
-        icon: const Icon(Icons.add),
-          label: Text(
-          'إضافة خط',
+        icon: const Icon(Icons.publish_outlined),
+        label: Text(
+          'نشر',
           style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
         ),
       ),
@@ -175,6 +207,28 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
                     borderSide: BorderSide(color: c.border),
                   ),
                 ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _AdminLaneTab(
+                      label: 'خطوط السائقين',
+                      count: _items.where((l) => l.isDriver).length,
+                      selected: !_ridersLane,
+                      onTap: () => setState(() => _ridersLane = false),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _AdminLaneTab(
+                      label: 'طلبات الركاب',
+                      count: _items.where((l) => !l.isDriver).length,
+                      selected: _ridersLane,
+                      onTap: () => setState(() => _ridersLane = true),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               Align(
@@ -204,6 +258,7 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
                     itemBuilder: (context, index) {
                       final l = filtered[index];
                       return ListTile(
+                        onTap: () => _edit(l),
                         title: Text(
                           '${l.area} ← ${l.destination}',
                           style: GoogleFonts.ibmPlexSansArabic(
@@ -211,24 +266,48 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
                           ),
                         ),
                         subtitle: Text(
-                          '${l.statusLabel} · ${l.scheduleLabel}\n'
+                          '${l.isDriver ? 'خط سائق' : 'طلب راكب'} · ${l.statusLabel} · ${l.scheduleLabel}\n'
                           '${l.contactPhone ?? l.contactTelegram ?? '—'}',
                           style: GoogleFonts.ibmPlexSansArabic(fontSize: 12),
                         ),
                         isThreeLine: true,
                         trailing: PopupMenuButton<String>(
                           onSelected: (v) {
+                            if (v == 'share') {
+                              showShareListingCardSheet(
+                                context,
+                                l.isDriver || DirectoryLaunch.freeRiderContacts
+                                    ? l
+                                    : l.withoutPublicContacts(),
+                              );
+                            }
                             if (v == 'edit') _edit(l);
+                            if (v == 'unbook') _unbook(l);
                             if (v == 'delete') _delete(l);
                           },
                           itemBuilder: (_) => [
                             PopupMenuItem(
-                              value: 'edit',
+                              value: 'share',
                               child: Text(
-                                'تعديل',
+                                'حفظ البطاقة',
                                 style: GoogleFonts.ibmPlexSansArabic(),
                               ),
                             ),
+                            PopupMenuItem(
+                              value: 'edit',
+                              child: Text(
+                                'مراجعة وتعديل',
+                                style: GoogleFonts.ibmPlexSansArabic(),
+                              ),
+                            ),
+                            if (!l.isDriver && l.isBooked)
+                              PopupMenuItem(
+                                value: 'unbook',
+                                child: Text(
+                                  'إزالة الحجز وإعادة النشر',
+                                  style: GoogleFonts.ibmPlexSansArabic(),
+                                ),
+                              ),
                             PopupMenuItem(
                               value: 'delete',
                               child: Text(
@@ -247,6 +326,61 @@ class _AdminListingsPageState extends State<AdminListingsPage> {
         ),
       ],
     ),
+    );
+  }
+}
+
+class _AdminLaneTab extends StatelessWidget {
+  const _AdminLaneTab({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Material(
+      color: selected ? c.primary.withValues(alpha: 0.12) : c.surface,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: selected ? c.primary : c.border,
+            ),
+          ),
+          child: Column(
+            children: [
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.ibmPlexSansArabic(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: selected ? c.primary : c.text,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '$count',
+                style: GoogleFonts.manrope(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  color: selected ? c.primary : c.text.withValues(alpha: 0.55),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

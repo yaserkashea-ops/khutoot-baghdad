@@ -5,23 +5,22 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:url_launcher/url_launcher.dart';
-
-import '../../core/config/admin_contact.dart';
-import '../../core/config/directory_launch.dart';
 import '../../core/auth/publisher_auth_controller.dart';
 import '../../core/auth/publisher_limits.dart';
 import '../../core/data/baghdad_places.dart';
 import '../../core/data/learned_places_store.dart';
 import '../../core/data/places_catalog.dart';
+import '../../core/listings/duplicate_listing.dart';
+import '../../core/listings/publish_draft_store.dart';
 import '../../core/models/listing.dart';
-import '../../core/models/listing_subscription.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/phone_digits.dart';
 import '../../core/utils/place_text_rules.dart';
 import '../../data/listings_repository.dart';
 import '../../data/publisher_repository.dart';
 import 'publisher_auth_sheet.dart';
+import 'widgets/listing_card.dart';
 import 'widgets/suggestible_text_field.dart';
 
 /// Publish / edit form for transit listings.
@@ -75,6 +74,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
 
   String? _editingId;
   bool _saving = false;
+  int _step = 0;
   List<String> _originSubs = [];
   List<String> _destinationSubs = [];
 
@@ -111,6 +111,11 @@ class _PublishListingPageState extends State<PublishListingPage> {
     unawaited(LearnedPlacesStore.purgeUserPlaces());
     PlacesCatalog.shared.addListener(_onPlacesChanged);
     unawaited(PlacesCatalog.shared.refresh());
+    if (!_isEditing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_restoreDraft());
+      });
+    }
     if (widget.asDirectoryRequest && !_isEditing) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_ensurePublisherAccountOrLeave());
@@ -127,6 +132,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
     final ok = await showPublisherAuthSheet(
       context,
       title: 'إنشاء حساب مطلوب لإضافة خطك',
+      requiredToContinue: true,
     );
     if (!mounted) return;
     if (!ok || !PublisherAuthController.shared.isLoggedIn) {
@@ -136,6 +142,93 @@ class _PublishListingPageState extends State<PublishListingPage> {
 
   void _onPlacesChanged() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _restoreDraft() async {
+    final data = await PublishDraftStore.load(PublishDraftStore.driverKey);
+    if (!mounted || data == null || data.isEmpty) return;
+    final resume = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('مسودة غير مكتملة'),
+        content: const Text('لديك منشور غير مكتمل. هل تريد المتابعة؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('تجاهل'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('متابعة'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (resume != true) {
+      await PublishDraftStore.clear(PublishDraftStore.driverKey);
+      return;
+    }
+    setState(() {
+      _area.text = data['area'] ?? _area.text;
+      _destination.text = data['dest'] ?? _destination.text;
+      _vehicle.text = data['vehicle'] ?? _vehicle.text;
+      _seats.text = data['seats'] ?? _seats.text;
+      _phone.text = data['phone'] ?? _phone.text;
+      _telegram.text = data['tg'] ?? _telegram.text;
+      _departureTime.text = data['dep'] ?? _departureTime.text;
+      _returnTime.text = data['ret'] ?? _returnTime.text;
+      if (data['time'] == 'evening') _timePeriod = TimePeriod.evening;
+      if (data['time'] == 'morning') _timePeriod = TimePeriod.morning;
+    });
+  }
+
+  void _persistDraft() {
+    unawaited(
+      PublishDraftStore.save(PublishDraftStore.driverKey, {
+        'area': _area.text,
+        'dest': _destination.text,
+        'vehicle': _vehicle.text,
+        'seats': _seats.text,
+        'phone': _phone.text,
+        'tg': _telegram.text,
+        'dep': _departureTime.text,
+        'ret': _returnTime.text,
+        'time': _timePeriod == TimePeriod.evening
+            ? 'evening'
+            : _timePeriod == TimePeriod.morning
+                ? 'morning'
+                : '',
+      }),
+    );
+  }
+
+  void _nextStep() {
+    if (_step == 0) {
+      if (_area.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          _toast('أدخل منطقة الانطلاق أولاً'),
+        );
+        return;
+      }
+      if (_destination.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          _toast('أدخل الوجهة'),
+        );
+        return;
+      }
+    } else if (_step == 1) {
+      if (_vehicle.text.trim().isEmpty ||
+          _seats.text.trim().isEmpty ||
+          _timePeriod == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          _toast('أكمل نوع السيارة وعدد المقاعد والتوقيت'),
+        );
+        return;
+      }
+    }
+    _persistDraft();
+    setState(() => _step++);
   }
 
   @override
@@ -250,6 +343,43 @@ class _PublishListingPageState extends State<PublishListingPage> {
   String? _placeOptional(String? value) =>
       PlaceTextRules.validate(value, maxLength: PlaceTextRules.subMaxLength);
 
+  String? _telegramOptional(String? value) {
+    final raw = (value ?? '').trim();
+    if (raw.isEmpty) return null;
+    final lower = raw.toLowerCase();
+    if (raw.contains('/') ||
+        lower.contains('t.me') ||
+        lower.contains('telegram') ||
+        lower.startsWith('http')) {
+      return 'يوزر تلغرام فقط — بدون رابط';
+    }
+    final user = raw.startsWith('@') ? raw.substring(1) : raw;
+    if (!RegExp(r'^[A-Za-z][A-Za-z0-9_]{2,31}$').hasMatch(user)) {
+      return 'يوزر تلغرام غير صالح (مثال: username)';
+    }
+    return null;
+  }
+
+  String? _normalizeTelegramUsername(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) return null;
+    final user = t.startsWith('@') ? t.substring(1) : t;
+    return '@$user';
+  }
+
+  String? _whatsappRequired(String? value) {
+    final raw = (value ?? '').trim();
+    if (raw.isEmpty) return 'رقم واتساب مطلوب';
+    if (RegExp(r'[A-Za-z@]').hasMatch(raw)) {
+      return 'أدخل رقماً فقط — بدون يوزر';
+    }
+    final digits = PhoneDigits.forWhatsApp(raw);
+    if (digits == null || !RegExp(r'^9647\d{9}$').hasMatch(digits)) {
+      return 'رقم عراقي غير صالح (مثال: 07XXXXXXXXX)';
+    }
+    return null;
+  }
+
   String? _required(String? value) {
     if (value == null || value.trim().isEmpty) return 'مطلوب';
     return null;
@@ -273,10 +403,17 @@ class _PublishListingPageState extends State<PublishListingPage> {
     }
 
     final phone = _phone.text.trim();
-    final telegram = _telegram.text.trim();
-    if (phone.isEmpty && telegram.isEmpty) {
+    final telegramRaw = _telegram.text.trim();
+    final telegramErr = _telegramOptional(telegramRaw);
+    if (telegramErr != null) {
+      ScaffoldMessenger.of(context).showSnackBar(_toast(telegramErr));
+      return;
+    }
+    final telegram = _normalizeTelegramUsername(telegramRaw);
+    final waDigits = PhoneDigits.forWhatsApp(phone);
+    if (waDigits == null || !RegExp(r'^9647\d{9}$').hasMatch(waDigits)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        _toast('أدخل واتساب (رقم/يوزر) أو تلغرام على الأقل'),
+        _toast('أدخل رقم واتساب عراقياً صالحاً (مثل 07XXXXXXXXX) — بدون يوزر'),
       );
       return;
     }
@@ -326,7 +463,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
     if (_type == ListingType.driver) {
       if (_vehicle.text.trim().isEmpty || _seats.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          _toast('نوع السيارة وعدد المقاعد مطلوبان للسائق'),
+          _toast('نوع سيارتك وعدد المقاعد مطلوبان للسائق'),
         );
         return;
       }
@@ -343,6 +480,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
         final ok = await showPublisherAuthSheet(
           context,
           title: 'إنشاء حساب مطلوب لإضافة خطك',
+          requiredToContinue: true,
         );
         if (!mounted || !ok || !PublisherAuthController.shared.isLoggedIn) {
           return;
@@ -389,9 +527,45 @@ class _PublishListingPageState extends State<PublishListingPage> {
         genderRequirement: _gender,
         vehicleType: _vehicle.text.trim(),
         seatsCount: seats,
-        contactPhone: phone.isEmpty ? null : phone,
-        contactTelegram: telegram.isEmpty ? null : telegram,
+        contactPhone: waDigits,
+        contactTelegram: telegram,
       );
+
+      if (!_isEditing && !widget.draftOnly && auth.isLoggedIn) {
+        final similar = DuplicateListing.similar(
+          mine: await PublisherRepository.shared.myListings(),
+          type: ListingType.driver,
+          area: draft.area,
+          destination: draft.destination,
+          time: draft.timePeriod,
+          phone: draft.contactPhone,
+        );
+        if (similar != null && mounted) {
+          final skip = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('منشور مشابه'),
+              content: Text(
+                'لديك منشور مشابه نشط. هل تريد تعديله بدل إنشاء منشور جديد؟\n${similar.area} ← ${similar.destination}',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('متابعة للنشر'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('إلغاء'),
+                ),
+              ],
+            ),
+          );
+          if (skip != true) {
+            if (mounted) setState(() => _saving = false);
+            return;
+          }
+        }
+      }
 
       if (widget.draftOnly) {
         final draftWithId = draft.copyWith(
@@ -408,6 +582,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
         final updated = await widget.repository.update(draft);
         if (!mounted) return;
         if (Navigator.of(context).canPop()) {
+          unawaited(PublishDraftStore.clear(PublishDraftStore.driverKey));
           Navigator.of(context).pop(updated);
         }
       } else if (widget.asDirectoryRequest) {
@@ -451,6 +626,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
         await _showRequestSubmitted(created);
         if (!mounted) return;
         if (Navigator.of(context).canPop()) {
+          unawaited(PublishDraftStore.clear(PublishDraftStore.driverKey));
           Navigator.of(context).pop(created);
         }
       } else {
@@ -488,6 +664,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
         }
         if (!mounted) return;
         if (Navigator.of(context).canPop()) {
+          unawaited(PublishDraftStore.clear(PublishDraftStore.driverKey));
           Navigator.of(context).pop(created);
         }
       }
@@ -497,103 +674,24 @@ class _PublishListingPageState extends State<PublishListingPage> {
   }
 
   Future<void> _showRequestSubmitted(Listing created) async {
-    final c = context.colors;
     final ref = created.referenceCode ?? created.id;
-    final days = ListingSubscription.periodDays;
-    final hideFees = DirectoryLaunch.hidePaymentCopy;
-    final message = hideFees
-        ? 'مرحباً، أرسلت طلب نشر خط في دليل خطوط بغداد.\n'
-            'رقم الطلب: $ref\n'
-            'المسار: ${created.area} ← ${created.destination}\n'
-            'التوقيت: ${created.timePeriodLabel}\n'
-            'صلاحية الظهور بعد النشر: $days يوماً، ثم أجدّد النشر بعدها.\n'
-            'أرجو مراجعة الطلب وإعلامي عند الجاهزية للنشر.'
-        : 'مرحباً، أرسلت طلب نشر خط في دليل خطوط بغداد.\n'
-            'رقم الطلب: $ref\n'
-            'المسار: ${created.area} ← ${created.destination}\n'
-            'التوقيت: ${created.timePeriodLabel}\n'
-            'صلاحية الظهور بعد النشر: $days يوماً ثم التجديد.\n'
-            'أرجو مراجعة الطلب وإعلامي بخطوات الدفع.';
-    final steps = hideFees
-        ? '1) تراجع الإدارة الطلب\n'
-            '2) قد نتواصل معك عبر واتساب أو تلغرام عند الحاجة\n'
-            '3) بعد الموافقة يُنشر الخط في الدليل لمدة $days يوماً\n'
-            '4) بعد انتهاء المدة عليك تجديد النشر ليبقى ظاهراً'
-        : '1) تراجع الإدارة الطلب\n'
-            '2) تُكمل دفع رسوم النشر عبر واتساب أو تلغرام\n'
-            '3) بعد تأكيد الدفع يُنشر الخط لمدة $days يوماً\n'
-            '4) بعد انتهاء المدة عليك تجديد النشر ليبقى ظاهراً';
     await showDialog<void>(
       context: context,
-      barrierDismissible: false,
       builder: (ctx) {
         return AlertDialog(
           title: Text(
-            'تم إرسال طلبك للمراجعة',
-            style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
+            'تم إرسال المنشور',
+            style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'رقم الطلب: $ref',
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    color: c.primary,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  steps,
-                  style: GoogleFonts.ibmPlexSansArabic(height: 1.5),
-                ),
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  onPressed: () async {
-                    await Clipboard.setData(ClipboardData(text: message));
-                    final uri = Uri.parse(AdminContact.whatsappUrl(message));
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  },
-                  icon: const Icon(Icons.chat),
-                  label: const Text('متابعة عبر واتساب'),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    await Clipboard.setData(ClipboardData(text: message));
-                    final uri = Uri.parse(AdminContact.telegram);
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  },
-                  icon: const Icon(Icons.send_outlined),
-                  label: const Text('متابعة عبر تلغرام'),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () async {
-                    await Clipboard.setData(ClipboardData(text: message));
-                    if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'تم نسخ تفاصيل الطلب',
-                            style: GoogleFonts.ibmPlexSansArabic(),
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                  child: const Text('نسخ تفاصيل الطلب'),
-                ),
-              ],
-            ),
+          content: Text(
+            'رقم الطلب: $ref\n\n'
+            'تم إرسال منشورك للمراجعة والموافقة، وسيظهر في الدليل بعد اعتماده.',
+            style: GoogleFonts.ibmPlexSansArabic(height: 1.5),
           ),
           actions: [
-            TextButton(
+            FilledButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('تم'),
+              child: const Text('حسناً'),
             ),
           ],
         );
@@ -642,7 +740,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
               children: [
             Text(
               widget.asDirectoryRequest
-                  ? 'أدخل تفاصيل خطك ليظهر في الدليل لمدة ${ListingSubscription.periodDays} يوماً، ثم جدّد النشر بعدها'
+                  ? 'أدخل تفاصيل خطك ليظهر في الدليل'
                   : 'أدخل تفاصيل الخط',
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 12,
@@ -650,17 +748,16 @@ class _PublishListingPageState extends State<PublishListingPage> {
                 color: c.text.withValues(alpha: 0.62),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
+            if (_step == 0) ...[
             SuggestibleTextField(
               fieldKey: const Key('field_area'),
-              label: 'المنطقة التي ينطلق منها الخط',
+              label: 'المنطقة او المدينة التي تنطلق منها',
               controller: _area,
               validator: _placeRequired,
               options: _knownAreas,
               addMissingLabel: BaghdadPlaces.addMissingArea,
-              hint: _listedOnlyPlaces
-                  ? 'اختر من القائمة'
-                  : 'اكتب بحرية أو اختر من القائمة',
+              hint: 'مثال: الدورة',
               listedOnly: _listedOnlyPlaces,
               maxLength: _mainPlaceMaxLength,
               inputFormatters: [
@@ -675,14 +772,12 @@ class _PublishListingPageState extends State<PublishListingPage> {
             const SizedBox(height: 10),
             SuggestibleTextField(
               fieldKey: const Key('field_destination'),
-              label: 'المنطقة التي يصل اليها الخط',
+              label: 'المنطقة او المدينة التي تصل اليها',
               controller: _destination,
               validator: _destinationRequired,
               options: _knownDestinations,
               addMissingLabel: BaghdadPlaces.addMissingDestination,
-              hint: _listedOnlyPlaces
-                  ? 'اختر من القائمة'
-                  : 'اكتب بحرية أو اختر من القائمة',
+              hint: 'مثال: الجادرية',
               listedOnly: _listedOnlyPlaces,
               maxLength: _mainPlaceMaxLength,
               inputFormatters: [
@@ -703,7 +798,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
                 fieldKey: const Key('field_origin_sub'),
                 label: '',
                 controller: _originSubInput,
-                hint: 'مثال: حي الجامعة',
+                hint: 'مثال: شارع الشرطة، شارع ابو طيارة',
                 options: _knownAreas,
                 addMissingLabel: BaghdadPlaces.addMissingArea,
                 validator: _placeOptional,
@@ -739,7 +834,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
                 fieldKey: const Key('field_destination_sub'),
                 label: '',
                 controller: _destinationSubInput,
-                hint: 'مثال: مجمع الجادرية',
+                hint: 'مثال: جامعة بغداد، جامعة النهرين',
                 options: _knownDestinations,
                 addMissingLabel: BaghdadPlaces.addMissingDestination,
                 validator: _placeOptional,
@@ -781,17 +876,19 @@ class _PublishListingPageState extends State<PublishListingPage> {
                 ),
               ),
             ],
+            ],
+            if (_step == 1) ...[
             const SizedBox(height: 10),
             _Field(
               fieldKey: const Key('field_vehicle'),
-              label: 'نوع السيارة',
+              label: 'نوع سيارتك',
               controller: _vehicle,
               validator: _required,
             ),
             const SizedBox(height: 10),
             _Field(
               fieldKey: const Key('field_seats'),
-              label: 'عدد المقاعد',
+              label: 'عدد المقاعد المتوفرة',
               controller: _seats,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -851,7 +948,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
                 children: [
                   Align(
                     alignment: AlignmentDirectional.centerStart,
-                    child: Text('الجنس المطلوب', style: _sectionLabel(c)),
+                    child: Text('الجنس', style: _sectionLabel(c)),
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -864,7 +961,7 @@ class _PublishListingPageState extends State<PublishListingPage> {
                             label: switch (option) {
                               GenderRequirement.femaleOnly => 'اناث',
                               GenderRequirement.maleOnly => 'ذكور',
-                              GenderRequirement.mixed => 'مختلط',
+                              GenderRequirement.mixed => 'الكل',
                             },
                             selected: _gender == option,
                             onTap: () => setState(() => _gender = option),
@@ -905,33 +1002,65 @@ class _PublishListingPageState extends State<PublishListingPage> {
                 ],
               ),
             ),
+            ],
+            if (_step == 2) ...[
             const SizedBox(height: 14),
             Text('وسيلة التواصل', style: _sectionLabel(c)),
-            const SizedBox(height: 2),
-            Text(
-              'واتساب أو تلغرام — واحد منهما على الأقل',
-              style: GoogleFonts.ibmPlexSansArabic(
-                fontWeight: FontWeight.w400,
-                fontSize: 11,
-                color: c.text.withValues(alpha: 0.5),
-              ),
-            ),
             const SizedBox(height: 6),
             _Field(
               fieldKey: const Key('field_phone'),
-              label: 'واتساب (رقم أو يوزر)',
+              label: 'واتساب (ليتواصل معك الراكبون)',
               controller: _phone,
-              keyboardType: TextInputType.text,
-              hint: '07XXXXXXXXX أو @username',
+              keyboardType: TextInputType.phone,
+              hint: '07XXXXXXXXX',
+              validator: _whatsappRequired,
               style: AppTheme.manrope(fontSize: 14, color: c.text),
             ),
             const SizedBox(height: 10),
             _Field(
               fieldKey: const Key('field_telegram'),
-              label: 'تلغرام (رابط أو يوزر)',
+              label: 'تلغرام (اختياري)',
               controller: _telegram,
-              hint: '@user أو https://t.me/...',
+              hint: 'username',
+              validator: _telegramOptional,
               style: AppTheme.manrope(fontSize: 14, color: c.text),
+            ),
+            const SizedBox(height: 14),
+            Text('معاينة المنشور', style: _sectionLabel(c)),
+            const SizedBox(height: 8),
+            ListingCard(
+              listing: Listing(
+                id: 'preview',
+                type: ListingType.driver,
+                area: _area.text.trim().isEmpty ? '—' : _area.text.trim(),
+                destination:
+                    _destination.text.trim().isEmpty ? '—' : _destination.text.trim(),
+                timePeriod: _timePeriod ?? TimePeriod.morning,
+                genderRequirement: _gender,
+                originSubs: List<String>.from(_originSubs),
+                destinationSubs: List<String>.from(_destinationSubs),
+                departureTime: _departureTime.text.trim().isEmpty
+                    ? null
+                    : _departureTime.text.trim(),
+                returnTime: _returnTime.text.trim().isEmpty
+                    ? null
+                    : _returnTime.text.trim(),
+                seatsCount: int.tryParse(_seats.text.trim()),
+                vehicleType: _vehicle.text.trim().isEmpty
+                    ? null
+                    : _vehicle.text.trim(),
+                contactPhone: _phone.text.trim().isEmpty
+                    ? null
+                    : _phone.text.trim(),
+                contactTelegram: _telegram.text.trim().isEmpty
+                    ? null
+                    : _telegram.text.trim(),
+                status: ListingStatus.published,
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+                bumpedAt: DateTime.now(),
+              ),
+              onContact: () {},
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -963,11 +1092,25 @@ class _PublishListingPageState extends State<PublishListingPage> {
                         _isEditing
                             ? 'حفظ التعديل'
                             : (widget.asDirectoryRequest
-                                ? 'إرسال للمراجعة'
+                                ? 'ارسال المنشور للمراجعة'
                                 : 'نشر'),
                       ),
               ),
             ),
+            ],
+            const SizedBox(height: 16),
+            if (_step > 0)
+              OutlinedButton(
+                onPressed: () => setState(() => _step--),
+                child: const Text('رجوع'),
+              ),
+            if (_step < 2) ...[
+              const SizedBox(height: 8),
+              FilledButton(
+                onPressed: _nextStep,
+                child: const Text('التالي'),
+              ),
+            ],
               ],
             ),
           ),

@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/config/preview_mode.dart';
 import '../core/data/supabase_mappers.dart';
 import '../core/matches/listing_route_match.dart';
 import '../core/models/listing.dart';
 import '../core/models/listing_subscription.dart';
+import '../core/notifications/publisher_push_registrar.dart';
 import '../core/utils/phone_digits.dart';
 
 /// Listings store. Uses Supabase when a client is provided, otherwise in-memory.
@@ -18,9 +22,45 @@ class ListingsRepository {
 
   late final List<Listing> _items = _client == null ? _seedLocal() : <Listing>[];
   int _seq = 100;
+  String? _lastWriteKey;
+  DateTime? _lastWriteAt;
+  Listing? _lastWritten;
+
+  String _writeKey(Listing listing) => [
+        listing.type.name,
+        listing.area.trim(),
+        listing.destination.trim(),
+        listing.timePeriod.name,
+        listing.vehicleType ?? '',
+        listing.contactPhone ?? '',
+        listing.contactTelegram ?? '',
+        listing.status.name,
+      ].join('|');
+
+  Listing? _replayWrite(Listing listing) {
+    final key = _writeKey(listing);
+    final at = _lastWriteAt;
+    final last = _lastWritten;
+    if (last == null || at == null || _lastWriteKey != key) return null;
+    if (DateTime.now().difference(at) > const Duration(seconds: 8)) return null;
+    return last;
+  }
+
+  Listing _rememberWrite(Listing listing) {
+    _lastWriteKey = _writeKey(listing);
+    _lastWriteAt = DateTime.now();
+    _lastWritten = listing;
+    return listing;
+  }
 
   static void bindShared(SupabaseClient client) {
+    if (PreviewMode.enabled) return;
     shared = ListingsRepository(client: client);
+  }
+
+  /// In-memory seed only. Safe to call more than once.
+  static void bindPreview() {
+    shared = ListingsRepository();
   }
 
   static List<Listing> _seedLocal() => [
@@ -41,6 +81,7 @@ class ListingsRepository {
           status: ListingStatus.published,
           governorate: 'بغداد',
           referenceCode: 'KH-LOCAL1',
+          ownerAccountId: PreviewMode.accountId,
           createdAt: DateTime.now().subtract(const Duration(hours: 2)),
           bumpedAt: DateTime.now().subtract(const Duration(hours: 2)),
           expiresAt: ListingSubscription.renewFromNow(
@@ -116,6 +157,61 @@ class ListingsRepository {
           referenceCode: 'KH-PAY01',
           createdAt: DateTime.now().subtract(const Duration(hours: 3)),
         ),
+        Listing(
+          id: 'r1',
+          type: ListingType.rider,
+          area: 'الدورة',
+          destination: 'الجادرية',
+          originSubs: const ['شارع أبو طيارة'],
+          destinationSubs: const ['جامعة بغداد'],
+          timePeriod: TimePeriod.morning,
+          departureTime: '7:00',
+          seatsCount: 1,
+          genderRequirement: GenderRequirement.mixed,
+          contactPhone: '9647705551111',
+          status: ListingStatus.published,
+          governorate: 'بغداد',
+          referenceCode: 'KH-RIDE1',
+          ownerAccountId: PreviewMode.accountId,
+          createdAt: DateTime.now().subtract(const Duration(hours: 5)),
+          bumpedAt: DateTime.now().subtract(const Duration(hours: 5)),
+          expiresAt: ListingSubscription.renewFromNow(
+            DateTime.now().subtract(const Duration(hours: 5)),
+          ),
+        ),
+        Listing(
+          id: 'r2',
+          type: ListingType.rider,
+          area: 'المنصور',
+          destination: 'باب المعظم',
+          timePeriod: TimePeriod.evening,
+          seatsCount: 2,
+          genderRequirement: GenderRequirement.femaleOnly,
+          contactTelegram: '@preview_rider',
+          status: ListingStatus.published,
+          governorate: 'بغداد',
+          referenceCode: 'KH-RIDE2',
+          createdAt: DateTime.now().subtract(const Duration(days: 2)),
+          bumpedAt: DateTime.now().subtract(const Duration(days: 2)),
+          expiresAt: ListingSubscription.renewFromNow(
+            DateTime.now().subtract(const Duration(days: 2)),
+          ),
+        ),
+        Listing(
+          id: 'legacy-open',
+          type: ListingType.rider,
+          area: '',
+          destination: '',
+          timePeriod: TimePeriod.morning,
+          genderRequirement: GenderRequirement.mixed,
+          vehicleType: 'خط صباحي...',
+          contactPhone: '9647701234567',
+          status: ListingStatus.published,
+          governorate: 'بغداد',
+          referenceCode: 'KH-OLD01',
+          createdAt: DateTime.now().subtract(const Duration(days: 10)),
+          bumpedAt: DateTime.now().subtract(const Duration(days: 10)),
+        ),
       ];
 
   Future<List<Listing>> fetchAll({bool publishedOnly = true}) async {
@@ -127,15 +223,15 @@ class ListingsRepository {
         }
         final rows = await query
             .order('bumped_at', ascending: false, nullsFirst: false)
-            .order('created_at', ascending: false);
+            .order('created_at', ascending: false)
+            .timeout(const Duration(seconds: 8));
         final list = (rows as List)
             .map((e) => ListingMapper.fromRow(Map<String, dynamic>.from(e as Map)))
             .where((l) => !publishedOnly || l.isLiveInDirectory)
             .toList()
           ..sort((a, b) => b.sortAt.compareTo(a.sortAt));
-        return List<Listing>.unmodifiable(list);
+        return List<Listing>.unmodifiable(await _withActiveBookings(list));
       } catch (_) {
-        // Migration may not be applied yet — fall back to all rows.
         final rows = await _client
             .from('listings')
             .select()
@@ -146,7 +242,7 @@ class ListingsRepository {
             .where((l) => !publishedOnly || l.isLiveInDirectory)
             .toList()
           ..sort((a, b) => b.sortAt.compareTo(a.sortAt));
-        return List<Listing>.unmodifiable(list);
+        return List<Listing>.unmodifiable(await _withActiveBookings(list));
       }
     }
     await Future<void>.delayed(const Duration(milliseconds: 40));
@@ -190,6 +286,8 @@ class ListingsRepository {
 
   /// Driver submits a route for admin review (not public yet).
   Future<Listing> submitRequest(Listing listing) async {
+    final replay = _replayWrite(listing.copyWith(status: ListingStatus.pendingReview));
+    if (replay != null) return replay;
     final payload = ListingMapper.toInsert(
       listing.copyWith(status: ListingStatus.pendingReview),
     );
@@ -202,7 +300,7 @@ class ListingsRepository {
         final map = row is Map
             ? Map<String, dynamic>.from(row)
             : Map<String, dynamic>.from((row as List).first as Map);
-        return ListingMapper.fromRow(map);
+        return _rememberWrite(ListingMapper.fromRow(map));
       } catch (_) {
         final row = await _client
             .from('listings')
@@ -212,8 +310,9 @@ class ListingsRepository {
               'governorate': listing.governorate,
             })
             .select()
-            .single();
-        return ListingMapper.fromRow(Map<String, dynamic>.from(row));
+            .single()
+            .timeout(const Duration(seconds: 8));
+        return _rememberWrite(ListingMapper.fromRow(Map<String, dynamic>.from(row)));
       }
     }
     await Future<void>.delayed(const Duration(milliseconds: 40));
@@ -227,7 +326,28 @@ class ListingsRepository {
       updatedAt: now,
     );
     _items.insert(0, created);
-    return created;
+    return _rememberWrite(created);
+  }
+
+  /// Guest compose on the unified public feed (preview / in-memory).
+  Future<Listing> publishUnifiedGuest(Listing listing) async {
+    final published = listing.copyWith(status: ListingStatus.published);
+    final replay = _replayWrite(published);
+    if (replay != null) return replay;
+    if (_client != null && !PreviewMode.enabled) {
+      return submitRequest(listing);
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+    final now = DateTime.now();
+    final created = listing.copyWith(
+      id: listing.id.isEmpty ? '${_seq++}' : listing.id,
+      status: ListingStatus.published,
+      createdAt: now,
+      updatedAt: now,
+      bumpedAt: now,
+    );
+    _items.insert(0, created);
+    return _rememberWrite(created);
   }
 
   Future<Listing> setStatus({
@@ -248,7 +368,7 @@ class ListingsRepository {
         final map = row is Map
             ? Map<String, dynamic>.from(row)
             : Map<String, dynamic>.from((row as List).first as Map);
-        return ListingMapper.fromRow(map);
+        return _afterPublishStatus(ListingMapper.fromRow(map));
       } catch (_) {
         final now = DateTime.now().toUtc();
         final row = await _client
@@ -267,7 +387,9 @@ class ListingsRepository {
             .eq('id', id)
             .select()
             .single();
-        return ListingMapper.fromRow(Map<String, dynamic>.from(row));
+        return _afterPublishStatus(
+          ListingMapper.fromRow(Map<String, dynamic>.from(row)),
+        );
       }
     }
     final index = _items.indexWhere((l) => l.id == id);
@@ -287,7 +409,14 @@ class ListingsRepository {
       updatedAt: now,
     );
     _items[index] = updated;
-    return updated;
+    return _afterPublishStatus(updated);
+  }
+
+  Listing _afterPublishStatus(Listing listing) {
+    if (listing.status == ListingStatus.published && !PreviewMode.enabled) {
+      unawaited(ListingPublishPush.notifyPublished(listing.id));
+    }
+    return listing;
   }
 
   /// Published / hidden / expired listings for the subscriptions admin tab.
@@ -343,6 +472,58 @@ class ListingsRepository {
     return updated;
   }
 
+  Future<Listing> setBooked(
+    String id, {
+    required bool booked,
+    bool republish = true,
+  }) async {
+    if (_client != null) {
+      try {
+        final now = DateTime.now().toUtc();
+        final payload = <String, dynamic>{
+          'is_booked': booked,
+          'updated_at': now.toIso8601String(),
+        };
+        if (!booked && republish) {
+          payload['status'] = 'published';
+          payload['is_hidden'] = false;
+          payload['bumped_at'] = now.toIso8601String();
+          payload['expires_at'] =
+              ListingSubscription.renewFromNow(now).toIso8601String();
+        }
+        final row = await _client
+            .from('listings')
+            .update(payload)
+            .eq('id', id)
+            .select()
+            .single();
+        return ListingMapper.fromRow(Map<String, dynamic>.from(row));
+      } catch (_) {
+        final found = await findById(id);
+        if (found == null) rethrow;
+        return found.copyWith(isBooked: booked, updatedAt: DateTime.now());
+      }
+    }
+    final index = _items.indexWhere((l) => l.id == id);
+    if (index < 0) throw StateError('Listing $id not found');
+    final now = DateTime.now();
+    final current = _items[index];
+    final updated = booked
+        ? current.copyWith(isBooked: true, updatedAt: now)
+        : republish
+            ? current.copyWith(
+                isBooked: false,
+                isHidden: false,
+                status: ListingStatus.published,
+                bumpedAt: now,
+                expiresAt: ListingSubscription.renewFromNow(now),
+                updatedAt: now,
+              )
+            : current.copyWith(isBooked: false, updatedAt: now);
+    _items[index] = updated;
+    return updated;
+  }
+
   Future<Listing> hideListing(String id) async {
     if (_client != null) {
       try {
@@ -377,7 +558,28 @@ class ListingsRepository {
     return updated;
   }
 
-  /// Opposite-type listings that share the same main area and destination.
+  /// Treat pending/approved contact unlocks as booked even if `is_booked` is missing.
+  Future<List<Listing>> _withActiveBookings(List<Listing> list) async {
+    if (_client == null || list.isEmpty) return list;
+    try {
+      final rows = await _client
+          .from('contact_unlocks')
+          .select('rider_request_id')
+          .inFilter('status', ['pending', 'approved']);
+      final ids = <String>{
+        for (final raw in rows as List)
+          '${(raw as Map)['rider_request_id'] ?? ''}',
+      }..remove('');
+      return [
+        for (final l in list)
+          l.isDriver ? l : l.copyWith(isBooked: ids.contains(l.id)),
+      ];
+    } catch (_) {
+      return list;
+    }
+  }
+
+  /// Opposite-type listings that share origin/destination (main or sub) and time.
   Future<List<Listing>> fetchRouteMatches(Listing mine) async {
     final opposite =
         mine.isDriver ? ListingType.rider : ListingType.driver;
@@ -400,7 +602,12 @@ class ListingsRepository {
       candidates = _items.where((l) => l.type == opposite).toList();
     }
     return List<Listing>.unmodifiable(
-      ListingRouteMatch.filterMatches(mine: mine, candidates: candidates),
+      await _withActiveBookings(
+        ListingRouteMatch.filterMatches(
+          mine: mine,
+          candidates: candidates.where((l) => l.isLiveInDirectory),
+        ),
+      ),
     );
   }
 
@@ -444,13 +651,16 @@ class ListingsRepository {
   }
 
   Future<Listing> insert(Listing listing) async {
+    final replay = _replayWrite(listing);
+    if (replay != null) return replay;
     if (_client != null) {
       final row = await _client
           .from('listings')
           .insert(ListingMapper.toInsert(listing))
           .select()
-          .single();
-      return ListingMapper.fromRow(Map<String, dynamic>.from(row));
+          .single()
+          .timeout(const Duration(seconds: 8));
+      return _rememberWrite(ListingMapper.fromRow(Map<String, dynamic>.from(row)));
     }
     await Future<void>.delayed(const Duration(milliseconds: 40));
     final now = DateTime.now();
@@ -467,7 +677,7 @@ class ListingsRepository {
       updatedAt: now,
     );
     _items.insert(0, created);
-    return created;
+    return _rememberWrite(created);
   }
 
   Future<List<Listing>> insertMany(Iterable<Listing> listings) async {
@@ -581,25 +791,18 @@ class ListingsRepository {
     return _items.length;
   }
 
-  /// Real directory lines: published driver routes that are visible and not expired.
+  /// Real directory lines: published driver routes that are not hidden.
   Future<int> countLiveDirectory() async {
     if (_client != null) {
       final rows = await _client
           .from('listings')
-          .select('id, expires_at, is_hidden, status, listing_type');
+          .select('id, is_hidden, status, listing_type');
       var n = 0;
       for (final raw in rows as List) {
         final map = Map<String, dynamic>.from(raw as Map);
         if (map['listing_type'] != 'driver') continue;
         if (map['status'] != 'published') continue;
         if (map['is_hidden'] == true) continue;
-        final exp = map['expires_at'];
-        if (exp != null) {
-          final at = DateTime.tryParse(exp.toString());
-          if (at != null && !at.toUtc().isAfter(DateTime.now().toUtc())) {
-            continue;
-          }
-        }
         n++;
       }
       return n;

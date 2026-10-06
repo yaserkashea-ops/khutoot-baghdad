@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../utils/phone_digits.dart';
 import 'supabase_config.dart';
 
 /// Admin contact channels for reports / complaints / issues.
@@ -16,7 +17,7 @@ class AdminContact extends ChangeNotifier {
   String _telegram = _defaultTelegram;
   bool _loaded = false;
 
-  /// Digits only, country code included (Iraq example).
+  /// Digits for WhatsApp — local Iraqi numbers are expanded to 964… automatically.
   static String get whatsappPhone => shared._whatsappPhone;
 
   /// Telegram username or full t.me link.
@@ -55,7 +56,7 @@ class AdminContact extends ChangeNotifier {
           : <String, dynamic>{};
       final wa = '${map['whatsapp_phone'] ?? ''}'.trim();
       final tg = '${map['telegram'] ?? ''}'.trim();
-      if (wa.isNotEmpty) _whatsappPhone = wa.replaceAll(RegExp(r'\D'), '');
+      if (wa.isNotEmpty) _whatsappPhone = PhoneDigits.normalize(wa);
       if (tg.isNotEmpty) _telegram = tg;
       _loaded = true;
       notifyListeners();
@@ -69,9 +70,9 @@ class AdminContact extends ChangeNotifier {
     required String whatsappPhone,
     required String telegram,
   }) async {
-    final wa = whatsappPhone.replaceAll(RegExp(r'\D'), '').trim();
+    final wa = PhoneDigits.normalize(whatsappPhone);
     final tg = telegram.trim();
-    if (wa.length < 8) {
+    if (wa.length < 10) {
       throw ArgumentError('رقم واتساب غير صالح');
     }
     if (tg.isEmpty) {
@@ -115,4 +116,4 @@ extension AdminContactKindLabel on AdminContactKind {
         AdminContactKind.problem => 'مشكلة تقنية أو صعوبة في استخدام الأداة',
       };
 }
-
+

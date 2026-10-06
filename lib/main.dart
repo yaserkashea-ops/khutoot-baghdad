@@ -11,10 +11,12 @@ import 'core/auth/publisher_auth_controller.dart';
 import 'core/bootstrap/app_bootstrap.dart';
 import 'core/config/admin_contact.dart';
 import 'core/config/app_hosts.dart';
+import 'core/config/preview_mode.dart';
 import 'core/config/supabase_config.dart';
 import 'core/data/places_catalog.dart';
 import 'core/theme/theme_controller.dart';
 import 'data/admin_repository.dart';
+import 'data/contact_unlocks_repository.dart';
 import 'data/listings_repository.dart';
 
 Future<void> main() async {
@@ -22,6 +24,9 @@ Future<void> main() async {
   GoogleFonts.config.allowRuntimeFetching = true;
 
   final isAdmin = AppHosts.isAdminHost;
+  if (PreviewMode.enabled) {
+    ListingsRepository.bindPreview();
+  }
 
   // Paint UI immediately — never wait on network before first frame
   // (waiting here caused the permanent green splash on slow/mobile).
@@ -34,7 +39,7 @@ Future<void> main() async {
   try {
     await Future.wait<void>([
       ThemeController.shared.load(),
-      _initSupabase(),
+      if (!PreviewMode.enabled) _initSupabase(),
       if (!isAdmin) PublisherAuthController.shared.load(),
     ]).timeout(const Duration(seconds: 8));
     if (isAdmin) {
@@ -49,11 +54,14 @@ Future<void> main() async {
   }
 
   // Background only — never block first paint.
-  unawaited(PlacesCatalog.shared.refresh());
-  unawaited(AdminContact.shared.refresh());
+  if (!PreviewMode.enabled) {
+    unawaited(PlacesCatalog.shared.refresh());
+    unawaited(AdminContact.shared.refresh());
+  }
 }
 
 Future<void> _initSupabase() async {
+  if (PreviewMode.enabled) return;
   if (!SupabaseConfig.isConfigured) {
     debugPrint(
       'Supabase غير مُعدّ — البيانات محلية. '
@@ -67,6 +75,7 @@ Future<void> _initSupabase() async {
   );
   final client = Supabase.instance.client;
   ListingsRepository.bindShared(client);
+  ContactUnlocksRepository.bindShared(client);
   AdminRepository.bindShared(
     listings: ListingsRepository.shared,
     client: client,

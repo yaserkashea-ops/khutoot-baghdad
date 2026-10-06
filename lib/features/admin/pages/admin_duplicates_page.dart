@@ -5,7 +5,7 @@ import '../../../core/models/listing.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/contact_keys.dart';
 import '../../../data/listings_repository.dart';
-import '../../listings/publish_listing_page.dart';
+import 'admin_listing_review_page.dart';
 
 enum _DupKind { phone, telegram }
 
@@ -156,15 +156,7 @@ class _AdminDuplicatesPageState extends State<AdminDuplicatesPage> {
   }
 
   Future<void> _edit(Listing listing) async {
-    final saved = await Navigator.of(context).push<Listing>(
-      MaterialPageRoute(
-        builder: (_) => PublishListingPage(
-          repository: ListingsRepository.shared,
-          initial: listing,
-          allowFreeTextPlaces: true,
-        ),
-      ),
-    );
+    final saved = await openAdminListingReview(context, listing);
     if (saved != null) await _load();
   }
 

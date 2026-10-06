@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
+import 'app_tokens.dart';
 
 abstract final class AppTheme {
   static ThemeData get light => _build(MasaratColors.light, Brightness.light);
@@ -76,11 +77,18 @@ abstract final class AppTheme {
         elevation: 2,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: c.background,
-        indicatorColor: c.primary.withValues(alpha: 0.16),
-        labelTextStyle: WidgetStatePropertyAll(
-          GoogleFonts.ibmPlexSansArabic(fontSize: 12, fontWeight: FontWeight.w500),
-        ),
+        backgroundColor: c.surface,
+        elevation: 0,
+        height: 68,
+        indicatorColor: c.primary.withValues(alpha: 0.12),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return GoogleFonts.ibmPlexSansArabic(
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected ? c.primary : c.text.withValues(alpha: 0.55),
+          );
+        }),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: c.surface,
@@ -94,6 +102,16 @@ abstract final class AppTheme {
         color: c.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        shadowColor: c.text.withValues(alpha: 0.08),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTokens.radius),
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size(AppTokens.minTap, AppTokens.minTap),
+          tapTargetSize: MaterialTapTargetSize.padded,
+        ),
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: c.surface,
@@ -107,21 +125,21 @@ abstract final class AppTheme {
         filled: true,
         fillColor: c.surface,
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: c.border),
+          borderRadius: BorderRadius.circular(AppTokens.radiusInner),
+          borderSide: BorderSide(color: c.border.withValues(alpha: 0.55)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: c.border.withValues(alpha: 0.9)),
+          borderRadius: BorderRadius.circular(AppTokens.radiusInner),
+          borderSide: BorderSide(color: c.border.withValues(alpha: 0.55)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppTokens.radiusInner),
           borderSide: BorderSide(color: c.primary.withValues(alpha: 0.9)),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppTokens.radiusInner),
           borderSide: BorderSide(color: c.riderAccent),
         ),
       ),
@@ -129,9 +147,9 @@ abstract final class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: c.primary,
           foregroundColor: c.onPrimary,
-          minimumSize: const Size.fromHeight(44),
+          minimumSize: const Size.fromHeight(AppTokens.minTap),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppTokens.radius),
           ),
           textStyle: GoogleFonts.ibmPlexSansArabic(
             fontWeight: FontWeight.w600,
@@ -142,10 +160,10 @@ abstract final class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: c.primary,
-          minimumSize: const Size.fromHeight(44),
+          minimumSize: const Size.fromHeight(AppTokens.minTap),
           side: BorderSide(color: c.primary.withValues(alpha: 0.45)),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppTokens.radius),
           ),
           textStyle: GoogleFonts.ibmPlexSansArabic(
             fontWeight: FontWeight.w600,

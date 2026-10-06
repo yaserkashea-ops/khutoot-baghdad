@@ -1,7 +1,7 @@
 'use strict';
 
 // Lightweight SW for PWA installability + offline + system notifications.
-const CACHE = 'khutoot-baghdad-shell-v170';
+const CACHE = 'khutoot-baghdad-shell-v171';
 const OFFLINE_URL = './offline.html';
 const ICON = self.location.origin + '/icons/app-icon-192-v19.png';
 const BADGE = self.location.origin + '/favicon-v19.png';

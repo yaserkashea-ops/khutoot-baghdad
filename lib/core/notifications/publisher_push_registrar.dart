@@ -67,4 +67,15 @@ abstract final class ListingPublishPush {
       // Function may not be deployed yet — local poll remains as fallback.
     }
   }
+
+  static Future<void> notifyUnlockApproved(String unlockId) async {
+    if (!SupabaseConfig.isConfigured) return;
+    if (unlockId.trim().isEmpty) return;
+    try {
+      await Supabase.instance.client.functions.invoke(
+        'notify-listing-published',
+        body: {'unlock_id': unlockId},
+      );
+    } catch (_) {}
+  }
 }

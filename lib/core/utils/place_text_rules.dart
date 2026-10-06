@@ -204,25 +204,29 @@ class PlaceTextInputFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     var text = newValue.text;
+    // Suggestion pick / paste replaces many characters at once. Typing rules
+    // (word cap, punctuation) must not block catalog names in main fields.
+    final bulkReplace = (newValue.text.length - oldValue.text.length).abs() > 1;
     if (text.length > maxLength) {
       text = text.substring(0, maxLength);
     }
     if (PlaceTextRules.containsLink(text)) {
       return oldValue;
     }
-    if (lettersWordsOnly &&
-        PlaceTextRules.containsDisallowedCustomChars(text)) {
-      return oldValue;
-    }
-    if (singleOnly && PlaceTextRules.containsMultiplePlaces(text)) {
-      return oldValue;
-    }
-    if (maxWords != null && PlaceTextRules.wordCount(text) > maxWords!) {
-      return oldValue;
-    }
-    // Collapse accidental double spaces while typing custom main places.
-    if (lettersWordsOnly && text.contains(RegExp(r'\s{2,}'))) {
-      return oldValue;
+    if (!bulkReplace) {
+      if (lettersWordsOnly &&
+          PlaceTextRules.containsDisallowedCustomChars(text)) {
+        return oldValue;
+      }
+      if (singleOnly && PlaceTextRules.containsMultiplePlaces(text)) {
+        return oldValue;
+      }
+      if (maxWords != null && PlaceTextRules.wordCount(text) > maxWords!) {
+        return oldValue;
+      }
+      if (lettersWordsOnly && text.contains(RegExp(r'\s{2,}'))) {
+        return oldValue;
+      }
     }
     if (text == newValue.text) return newValue;
     return TextEditingValue(

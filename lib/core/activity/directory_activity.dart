@@ -65,10 +65,44 @@ abstract final class DirectoryActivity {
     return null;
   }
 
-  /// Formatted like global apps: "26,978 مستخدم".
+  /// Public directory open total as of 2 Oct 2026 — dashboard never shows below this.
+  static const progressFloor = 4041;
+
+  static int displayCount(int raw) {
+    final n = raw < 0 ? 0 : raw;
+    return n < progressFloor ? progressFloor : n;
+  }
+
+  static int progressDelta(int raw) {
+    final shown = displayCount(raw);
+    final d = shown - progressFloor;
+    return d < 0 ? 0 : d;
+  }
+
+  /// Read-only total for the admin dashboard — does not increment.
+  static Future<int> fetchCount() async {
+    await loadCachedCount();
+    if (!SupabaseConfig.isConfigured) {
+      return displayCount(cachedCount);
+    }
+    try {
+      final raw =
+          await Supabase.instance.client.rpc('get_directory_open_count');
+      final n = _asInt(raw);
+      if (n != null) {
+        _memoryCount = n;
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt(_cachedCountKey, n);
+        } catch (_) {}
+        return displayCount(n);
+      }
+    } catch (_) {}
+    return displayCount(cachedCount);
+  }
+
   static String labelFor(int count) {
-    final n = count < 0 ? 0 : count;
-    return '${formatCount(n)} مستخدم';
+    return '${formatCount(displayCount(count))} مستخدم';
   }
 
   /// Thousand separators: 26978 → "26,978".

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -201,8 +201,10 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
           controller: _whatsapp,
           keyboardType: TextInputType.phone,
           decoration: InputDecoration(
-            labelText: 'واتساب (مع رمز الدولة)',
-            hintText: '9647XXXXXXXXX',
+            labelText: 'واتساب',
+            hintText: '07XXXXXXXXX أو 9647XXXXXXXXX',
+            helperText: 'الرقم المحلي العراقي يكفي — يُضاف رمز العراق تلقائياً',
+            helperMaxLines: 2,
             border: const OutlineInputBorder(),
             filled: true,
             fillColor: c.surface,
@@ -330,4 +332,4 @@ class _CopyableField extends StatelessWidget {
     );
   }
 }
-
+

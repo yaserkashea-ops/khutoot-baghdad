@@ -7,6 +7,7 @@ import 'match_notify_service.dart';
 import 'notification_prefs.dart';
 import 'publish_notify_service.dart';
 import 'publisher_push_registrar.dart';
+import 'unlock_notify_service.dart';
 import 'web_local_notifications.dart';
 
 /// Shared toggle for publisher system notifications (publish + matches).
@@ -68,13 +69,14 @@ Future<void> togglePublisherNotifications(
   await prefs.setEnabled(true);
   MatchNotifyService.shared.start();
   PublishNotifyService.shared.start();
+  UnlockNotifyService.shared.start();
 
   // Subscribe for true phone-tray push (works while app is closed).
   await PublisherPushRegistrar.register();
 
   await WebLocalNotifications.show(
     title: 'تم تفعيل إشعارات دليل خطوط بغداد',
-    body: 'سنُعلمك عند تفعيل خطك',
+    body: 'سنُعلمك عند موافقة الإدارة على خطك وعند وجود مطابقة',
     tag: 'khutoot-notify-on',
   );
 

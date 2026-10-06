@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/preview_mode.dart';
 import '../config/supabase_config.dart';
 
 /// Admin session via Supabase Auth (email + password).
@@ -21,6 +22,7 @@ class AdminAuthController extends ChangeNotifier {
   bool _localDemoSignedIn = false;
 
   SupabaseClient? get _client {
+    if (PreviewMode.enabled) return null;
     try {
       return Supabase.instance.client;
     } catch (_) {
@@ -28,8 +30,12 @@ class AdminAuthController extends ChangeNotifier {
     }
   }
 
-  bool get allowsLocalDemo =>
-      kDebugMode || !SupabaseConfig.isConfigured;
+  bool get allowsLocalDemo {
+    final host = Uri.base.host.toLowerCase();
+    return kDebugMode ||
+        !SupabaseConfig.isConfigured ||
+        host.contains('--trial');
+  }
 
   bool get isLoaded => _loaded;
   bool get isSignedIn =>

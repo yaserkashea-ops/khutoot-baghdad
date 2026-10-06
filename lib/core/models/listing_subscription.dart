@@ -10,9 +10,8 @@ abstract final class ListingSubscription {
 
   /// Driver-facing note: 30-day visibility then renew (no fee wording).
   static String get driverVisibilityNote =>
-      'صلاحية ظهور الخط في الدليل $periodDays يوماً من تاريخ النشر، '
-      'وبعدها عليك تجديد النشر ليبقى ظاهراً.';
+      'يظهر المنشور في الدليل ويُعتمد آخر تحديث.';
 
   static String get driverVisibilityShort =>
-      'الظهور لمدة $periodDays يوماً ثم تجديد النشر';
+      'الاعتماد على آخر تحديث';
 }

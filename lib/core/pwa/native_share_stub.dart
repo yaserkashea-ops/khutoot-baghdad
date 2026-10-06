@@ -19,4 +19,13 @@ abstract final class NativeShare {
   }) async {
     return NativeShareOutcome.unavailable;
   }
+
+  static Future<NativeShareOutcome> shareImage({
+    required List<int> bytes,
+    required String filename,
+    required String title,
+    String? text,
+  }) async {
+    return NativeShareOutcome.unavailable;
+  }
 }

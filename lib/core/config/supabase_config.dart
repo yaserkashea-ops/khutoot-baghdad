@@ -1,3 +1,5 @@
+import 'preview_mode.dart';
+
 /// Supabase project credentials for خطوط بغداد.
 ///
 /// Fill [url] and [anonKey] from:
@@ -23,6 +25,9 @@ abstract final class SupabaseConfig {
   static const _anonKeyFallback =
       'sb_publishable_SEVHXVQEu_yCz7dLNdIkCA_5H_odBRI';
 
+  /// Preview builds never count as configured, so no production client is used.
   static bool get isConfigured =>
-      url.trim().isNotEmpty && anonKey.trim().isNotEmpty;
+      !PreviewMode.enabled &&
+      url.trim().isNotEmpty &&
+      anonKey.trim().isNotEmpty;
 }

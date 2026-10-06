@@ -58,12 +58,20 @@ abstract final class ListingContact {
     final value = (raw ?? '').trim();
     if (value.isEmpty) return null;
     if (value.startsWith('http://') || value.startsWith('https://')) {
+      final uri = Uri.tryParse(value);
+      if (uri == null) return null;
+      if (uri.scheme != 'http' && uri.scheme != 'https') return null;
+      final host = uri.host.toLowerCase();
+      if (host != 't.me' && host != 'telegram.me' && host != 'www.t.me') {
+        return null;
+      }
       return value;
     }
     final user = value.startsWith('@') ? value.substring(1) : value;
     if (user.isEmpty) return null;
     // Digits-only strings are phones, not Telegram usernames.
     if (RegExp(r'^\d+$').hasMatch(user)) return null;
+    if (!RegExp(r'^[A-Za-z][A-Za-z0-9_]{2,31}$').hasMatch(user)) return null;
     return 'https://t.me/$user';
   }
 
@@ -182,6 +190,10 @@ abstract final class ListingContact {
     final out = <ContactOption>[];
     final phone = (listing.contactPhone ?? '').trim();
     final telegram = (listing.contactTelegram ?? '').trim();
+    final call = telUrl(phone);
+    if (call != null) {
+      out.add(ContactOption(label: 'اتصال', url: call, detail: phone));
+    }
     final wa = whatsappUrl(phone);
     if (wa != null) {
       out.add(ContactOption(label: 'واتساب', url: wa, detail: phone));
@@ -191,6 +203,12 @@ abstract final class ListingContact {
       out.add(ContactOption(label: 'تلغرام', url: tg, detail: telegram));
     }
     return out;
+  }
+
+  static String? telUrl(String? raw) {
+    final digits = PhoneDigits.normalize(raw ?? '');
+    if (digits.length < 10) return null;
+    return 'tel:+$digits';
   }
 
   static Future<bool> openUrl(String url) {

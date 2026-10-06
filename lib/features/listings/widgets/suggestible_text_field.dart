@@ -122,9 +122,8 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
   void _cancelArm() {
     final restore = _typedBeforeArm;
     _typedBeforeArm = null;
-    if (restore != null) {
-      _setControllerText(restore);
-    }
+    if (restore == null) return;
+    _setControllerText(restore);
     _applyingSuggestion = false;
   }
 
@@ -302,12 +301,10 @@ class _SuggestibleTextFieldState extends State<SuggestibleTextField> {
             return TapRegion(
               groupId: _tapGroup,
               onTapOutside: (_) {
+                if (_applyingSuggestion) return;
                 if (_menu.isOpen) {
                   _menu.close();
-                  _applyingSuggestion = false;
-                  _typedBeforeArm = null;
-                  setState(() {});
-                  _emitCommitted(unfocus: false);
+                  if (mounted) setState(() {});
                 }
               },
               child: KeyedSubtree(

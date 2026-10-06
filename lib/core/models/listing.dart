@@ -1,5 +1,4 @@
 import '../config/directory_launch.dart';
-import 'listing_subscription.dart';
 
 enum ListingType { driver, rider }
 
@@ -42,6 +41,7 @@ class Listing {
     this.bumpedAt,
     this.expiresAt,
     this.isHidden = false,
+    this.isBooked = false,
   });
 
   final String id;
@@ -79,15 +79,16 @@ class Listing {
   final DateTime? expiresAt;
   final bool isHidden;
 
+  /// Rider request reserved after a paid contact unlock is approved.
+  final bool isBooked;
+
   bool get isDriver => type == ListingType.driver;
 
   bool get isPublished => status == ListingStatus.published;
 
-  /// Anchor for the current 30-day window.
   DateTime get subscriptionStart =>
       bumpedAt ?? createdAt ?? updatedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
 
-  /// Effective end of paid visibility (falls back to start + 30 days).
   DateTime get effectiveExpiresAt {
     if (expiresAt != null) return expiresAt!;
     return subscriptionStart.add(const Duration(days: 30));
@@ -96,8 +97,43 @@ class Listing {
   bool get isExpired =>
       isPublished && DateTime.now().isAfter(effectiveExpiresAt);
 
-  /// Visible on the public directory.
-  bool get isLiveInDirectory => isPublished && !isHidden && !isExpired;
+  /// Visible on the public directory until hidden or deleted by admin.
+  bool get isLiveInDirectory => isPublished && !isHidden;
+
+  /// Public card status. Expired posts stay listed until admin deletes them.
+  String get directoryRibbon {
+    if (!isDriver && isBooked && !DirectoryLaunch.freeRiderContacts) {
+      return 'محجوز';
+    }
+    if (isHidden) return 'مخفي';
+    if (status == ListingStatus.pendingReview) return 'قيد المراجعة';
+    if (status == ListingStatus.awaitingPayment) {
+      return DirectoryLaunch.hidePaymentCopy ? 'قيد التجهيز' : 'بانتظار الدفع';
+    }
+    if (seatsCount == 0) return 'المقاعد مكتمل';
+    if (isPublished) return '';
+    if (status == ListingStatus.rejected) return 'مرفوض';
+    return '';
+  }
+
+  bool get showsLivePulse =>
+      isLiveInDirectory &&
+      seatsCount != 0 &&
+      !(!isDriver && isBooked && !DirectoryLaunch.freeRiderContacts);
+
+  String get lastUpdateLabel {
+    final at = (bumpedAt ?? updatedAt ?? createdAt)?.toLocal();
+    if (at == null) return 'آخر تحديث: غير محدد';
+    final diff = DateTime.now().difference(at);
+    if (diff.isNegative || diff.inSeconds < 45) return 'آخر تحديث: الآن';
+    if (diff.inMinutes < 60) {
+      return 'آخر تحديث: قبل ${diff.inMinutes.clamp(1, 59)} د';
+    }
+    if (diff.inHours < 24) {
+      return 'آخر تحديث: قبل ${diff.inHours.clamp(1, 23)} س';
+    }
+    return 'آخر تحديث: قبل ${diff.inDays.clamp(1, 999)} ي';
+  }
 
   /// Whole calendar days left (0 if expired).
   int get wholeDaysLeft {
@@ -114,6 +150,22 @@ class Listing {
   String get originSubsLabel => originSubs.join('، ');
 
   String get destinationSubsLabel => destinationSubs.join('، ');
+
+  /// Same style as publish requests: `KH-` + 6 characters.
+  String get displayCode => shortRequestCode(referenceCode, id);
+
+  static String shortRequestCode(String? referenceCode, String id) {
+    final ref = (referenceCode ?? '').trim().toUpperCase();
+    if (ref.isNotEmpty) {
+      final rest = (ref.startsWith('KH-') ? ref.substring(3) : ref)
+          .replaceAll(RegExp(r'[^A-Z0-9]'), '');
+      if (rest.length >= 6) return 'KH-${rest.substring(0, 6)}';
+      if (rest.isNotEmpty) return 'KH-$rest';
+    }
+    final hex = id.replaceAll('-', '').toUpperCase();
+    if (hex.length >= 6) return 'KH-${hex.substring(0, 6)}';
+    return id;
+  }
 
   String get timePeriodLabel => switch (timePeriod) {
         TimePeriod.morning => 'صباحي',
@@ -133,18 +185,32 @@ class Listing {
   String get genderLabel => switch (genderRequirement) {
         GenderRequirement.maleOnly => 'ذكور فقط',
         GenderRequirement.femaleOnly => 'اناث فقط',
-        GenderRequirement.mixed => 'مختلط',
+        GenderRequirement.mixed => 'الكل',
       };
+
+  String? get publicGenderLabel =>
+      genderRequirement == GenderRequirement.mixed ? null : genderLabel;
 
   String get typeLabel => isDriver ? 'خط' : 'راكب';
 
+  /// Free-text rider request details (stored in [vehicleType] for riders).
+  String? get routeDetails {
+    if (isDriver) return null;
+    final v = vehicleType?.trim();
+    return (v == null || v.isEmpty) ? null : v;
+  }
+
+  /// Directory cards must not expose rider phones until an unlock is approved.
+  Listing withoutPublicContacts() {
+    if (isDriver) return this;
+    return copyWith(clearPhone: true, clearTelegram: true);
+  }
+
   String get statusLabel {
-    if (isHidden) return 'مخفي';
-    if (isExpired) {
-      return DirectoryLaunch.hidePaymentCopy
-          ? 'انتهت صلاحية الظهور — جدّد النشر'
-          : 'انتهى الاشتراك';
+    if (!isDriver && isBooked && !DirectoryLaunch.freeRiderContacts) {
+      return 'محجوز';
     }
+    if (isHidden) return 'مخفي';
     return switch (status) {
       ListingStatus.pendingReview => 'بانتظار المراجعة',
       ListingStatus.awaitingPayment => DirectoryLaunch.hidePaymentCopy
@@ -155,28 +221,12 @@ class Listing {
     };
   }
 
-  /// Extra line for the driver's own listings about the 30-day window.
+  /// Owner-only notes. Visibility is not time-limited; last update is the signal.
   String? get visibilityHint {
-    if (isHidden || status == ListingStatus.rejected) return null;
-    if (isExpired) {
-      return 'انتهت صلاحية الظهور — 0 يوم متبقّى '
-          '(من أصل ${ListingSubscription.periodDays}) — جدّد النشر ليظهر مجدداً';
+    if (!isDriver && isBooked && !DirectoryLaunch.freeRiderContacts) {
+      return 'الطلب محجوز ويظهر وسم «محجوز» في الدليل حتى يُؤكَّد أنه لا يزال متاحاً ثم يُزال الحجز ويُعاد نشره';
     }
-    if (!isPublished) {
-      return 'بعد الموافقة والنشر: صلاحية الظهور '
-          '${ListingSubscription.periodDays} يوماً، ثم التجديد';
-    }
-    final days = wholeDaysLeft;
-    return 'صلاحية الظهور: متبقّى $days '
-        '${_dayWord(days)} من أصل ${ListingSubscription.periodDays} يوماً'
-        '${days <= 7 ? ' — جدّد النشر قريباً' : ' — جدّد النشر بعد انتهائها'}';
-  }
-
-  static String _dayWord(int days) {
-    if (days == 1) return 'يوم';
-    if (days == 2) return 'يومين';
-    if (days >= 3 && days <= 10) return 'أيام';
-    return 'يوماً';
+    return null;
   }
 
   Listing copyWith({
@@ -205,6 +255,7 @@ class Listing {
     DateTime? bumpedAt,
     DateTime? expiresAt,
     bool? isHidden,
+    bool? isBooked,
     bool clearDeparture = false,
     bool clearReturn = false,
     bool clearVehicle = false,
@@ -246,6 +297,7 @@ class Listing {
       bumpedAt: bumpedAt ?? this.bumpedAt,
       expiresAt: clearExpires ? null : (expiresAt ?? this.expiresAt),
       isHidden: isHidden ?? this.isHidden,
+      isBooked: isBooked ?? this.isBooked,
     );
   }
 }

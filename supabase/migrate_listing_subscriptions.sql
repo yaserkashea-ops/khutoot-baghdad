@@ -25,7 +25,8 @@ create index if not exists idx_listings_expires_at
 create index if not exists idx_listings_is_hidden
   on public.listings (is_hidden);
 
--- Public directory: published, not hidden, not expired.
+-- Public directory: published, not hidden.
+-- Expiry is informational — posts are never auto-deleted or auto-removed.
 drop policy if exists listings_select_published on public.listings;
 create policy listings_select_published
   on public.listings
@@ -35,7 +36,6 @@ create policy listings_select_published
     (
       status = 'published'
       and coalesce(is_hidden, false) = false
-      and (expires_at is null or expires_at > now())
     )
     or auth.role() = 'authenticated'
   );

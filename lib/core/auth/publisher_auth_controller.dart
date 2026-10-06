@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../config/preview_mode.dart';
 import 'publisher_session_store.dart';
 
 /// Publisher accounts (username/phone + password, no OTP).
@@ -22,6 +23,14 @@ class PublisherAuthController extends ChangeNotifier {
   String? get accountId => _accountId;
   String? get lastError => _lastError;
   bool get isLoaded => _loaded;
+  static const trialLogin = 'tajriba';
+  static const trialPassword = 'tajriba1234';
+
+  bool get allowsTrialAccount {
+    if (PreviewMode.enabled) return true;
+    final host = Uri.base.host.toLowerCase();
+    return kDebugMode || host.contains('--trial');
+  }
 
   Future<void> load() async {
     try {
@@ -50,8 +59,36 @@ class PublisherAuthController extends ChangeNotifier {
     return _authRpc('publisher_login', login, password);
   }
 
+  /// Trial host / local debug: create or reuse a publisher account for testing.
+  Future<bool> enterTrialAccount() async {
+    if (await signIn(trialLogin, trialPassword)) return true;
+    if (await register(trialLogin, trialPassword)) return true;
+    if (await signIn(trialLogin, trialPassword)) return true;
+    return false;
+  }
+
   Future<bool> _authRpc(String fn, String login, String password) async {
     _lastError = null;
+    if (PreviewMode.enabled) {
+      final name = login.trim();
+      if (name.length < 3) {
+        _lastError = 'اكتب اسماً أو رقماً أوضح (٣ أحرف على الأقل)';
+        notifyListeners();
+        return false;
+      }
+      if (password.length < 4) {
+        _lastError = 'كلمة المرور قصيرة جداً (٤ أحرف على الأقل)';
+        notifyListeners();
+        return false;
+      }
+      await _persist(
+        token: PreviewMode.sessionToken,
+        accountId: PreviewMode.accountId,
+        login: name,
+      );
+      notifyListeners();
+      return isLoggedIn;
+    }
     final client = _clientOrNull();
     if (client == null) {
       _lastError = 'الاتصال غير جاهز. حاول مجدداً.';
@@ -111,6 +148,7 @@ class PublisherAuthController extends ChangeNotifier {
   }
 
   SupabaseClient? _clientOrNull() {
+    if (PreviewMode.enabled) return null;
     try {
       return Supabase.instance.client;
     } catch (_) {

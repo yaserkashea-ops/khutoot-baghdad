@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/config/admin_config.dart';
+import 'core/config/preview_mode_banner.dart';
 import 'core/pwa/install_prompt_host.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/admin/admin_gate_page.dart';
-import 'features/listings/listings_page.dart';
+import 'features/listings/directory_shell.dart';
 
 class MasaratApp extends StatelessWidget {
   const MasaratApp({super.key});
@@ -48,8 +49,10 @@ class MasaratApp extends StatelessWidget {
               data: clamped,
               child: Directionality(
                 textDirection: TextDirection.rtl,
-                child: InstallPromptHost(
-                  child: child ?? const SizedBox.shrink(),
+                child: PreviewModeBanner(
+                  child: InstallPromptHost(
+                    child: child ?? const SizedBox.shrink(),
+                  ),
                 ),
               ),
             );
@@ -66,7 +69,7 @@ class MasaratApp extends StatelessWidget {
             }
             return MaterialPageRoute<void>(
               settings: settings,
-              builder: (_) => const ListingsPage(),
+              builder: (_) => const DirectoryShell(),
             );
           },
         );

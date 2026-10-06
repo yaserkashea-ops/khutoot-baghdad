@@ -14,7 +14,14 @@ abstract final class ListingMapper {
       timePeriod: _periodFrom(row['time_period'] as String?),
       departureTime: row['departure_time'] as String?,
       returnTime: row['return_time'] as String?,
-      vehicleType: row['vehicle_type'] as String?,
+      vehicleType: () {
+        final details = (row['route_details'] as String?)?.trim();
+        final vehicle = row['vehicle_type'] as String?;
+        if (_typeFrom(row['listing_type'] as String?) == ListingType.rider) {
+          if (details != null && details.isNotEmpty) return details;
+        }
+        return vehicle;
+      }(),
       seatsCount: row['seats_count'] as int?,
       genderRequirement: _genderFrom(row['gender_requirement'] as String?),
       contactPhone: row['contact_phone'] as String?,
@@ -32,6 +39,7 @@ abstract final class ListingMapper {
       bumpedAt: _date(row['bumped_at']),
       expiresAt: _date(row['expires_at']),
       isHidden: row['is_hidden'] == true,
+      isBooked: row['is_booked'] == true,
     );
   }
 

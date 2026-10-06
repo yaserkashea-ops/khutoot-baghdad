@@ -3,16 +3,41 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/app_hosts.dart';
+import '../../../core/listings/unified_post_kind.dart';
 import '../../../core/models/listing.dart';
 import '../../../core/notifications/publisher_push_registrar.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/listing_contact.dart';
+import '../../../core/utils/phone_digits.dart';
 import '../../../data/listings_repository.dart';
-import '../../listings/publish_listing_page.dart';
+import '../../listings/widgets/listing_card.dart';
 import '../widgets/admin_double_confirm.dart';
+import '../widgets/admin_publish_flow.dart';
+import 'admin_listing_review_page.dart';
 
-/// Admin queue: review → await payment → publish / reject.
+/// WhatsApp body sent when admin rejects a listing.
+String listingRejectionNotice({
+  required String reference,
+  required String origin,
+  required String destination,
+  required String reason,
+}) {
+  return 'مرحباً، بخصوص منشورك في دليل خطوط بغداد.\n'
+      'رقم الطلب: $reference\n'
+      'المسار: $origin ← $destination\n\n'
+      'لم يُنشر حالياً لهذا السبب:\n$reason\n\n'
+      'يرجى تعديل المنشور وفق الملاحظات وإعادة الإرسال.\n'
+      'شكراً لك.\n\n'
+      '${AppHosts.publicUrl}';
+}
+
+/// Admin queue: review a full card then publish, edit, or reject.
 class AdminRequestsPage extends StatefulWidget {
   const AdminRequestsPage({super.key});
+
+  /// Dashboard shortcuts: false = متوفر خط, true = مطلوب خط.
+  static final ValueNotifier<bool> preferRidersTab = ValueNotifier(false);
 
   @override
   State<AdminRequestsPage> createState() => _AdminRequestsPageState();
@@ -20,6 +45,8 @@ class AdminRequestsPage extends StatefulWidget {
 
 class _AdminRequestsPageState extends State<AdminRequestsPage> {
   ListingStatus? _filter = ListingStatus.pendingReview;
+  /// null = الكل, false = متوفر خط, true = مطلوب خط
+  bool? _wantedOnly;
   final _search = TextEditingController();
   List<Listing> _items = const [];
   bool _loading = true;
@@ -28,11 +55,25 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
   @override
   void initState() {
     super.initState();
+    _wantedOnly = AdminRequestsPage.preferRidersTab.value ? true : null;
+    AdminRequestsPage.preferRidersTab.addListener(_onPreferRiders);
     _load();
+  }
+
+  void _onPreferRiders() {
+    final riders = AdminRequestsPage.preferRidersTab.value;
+    if (!mounted) return;
+    setState(() {
+      _wantedOnly = riders ? true : false;
+      if (_wantedOnly == true && _filter == ListingStatus.awaitingPayment) {
+        _filter = ListingStatus.pendingReview;
+      }
+    });
   }
 
   @override
   void dispose() {
+    AdminRequestsPage.preferRidersTab.removeListener(_onPreferRiders);
     _search.dispose();
     super.dispose();
   }
@@ -56,6 +97,8 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
     final q = _query;
     final qNorm = _normalizeRef(q);
     return _items.where((l) {
+      if (_wantedOnly == false && !l.isDriver) return false;
+      if (_wantedOnly == true && l.isDriver) return false;
       if (_hasQuery) {
         return _matchesSearch(l, q, qNorm);
       }
@@ -96,61 +139,19 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
     return blob.contains(q.toLowerCase());
   }
 
-  Future<void> _edit(Listing listing) async {
-    final edited = await Navigator.of(context).push<Listing>(
-      MaterialPageRoute(
-        builder: (_) => PublishListingPage(
-          repository: ListingsRepository.shared,
-          initial: listing,
-          draftOnly: true,
-          allowFreeTextPlaces: true,
+  Future<void> _openReview(Listing listing) async {
+    final edited = await openAdminListingReview(context, listing);
+    if (edited == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          'تم حفظ تعديل الطلب',
+          style: GoogleFonts.ibmPlexSansArabic(),
         ),
       ),
     );
-    if (edited == null || !mounted) return;
-
-    setState(() => _busyId = listing.id);
-    try {
-      await ListingsRepository.shared.update(
-        edited.copyWith(
-          id: listing.id,
-          status: listing.status,
-          referenceCode: listing.referenceCode,
-          governorate: listing.governorate,
-          adminNote: listing.adminNote,
-          expiresAt: listing.expiresAt,
-          isHidden: listing.isHidden,
-          ownerAccountId: listing.ownerAccountId,
-          viewCount: listing.viewCount,
-          createdAt: listing.createdAt,
-          bumpedAt: listing.bumpedAt,
-        ),
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(
-            'تم حفظ تعديل الطلب',
-            style: GoogleFonts.ibmPlexSansArabic(),
-          ),
-        ),
-      );
-      await _load();
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(
-            'تعذر حفظ التعديل',
-            style: GoogleFonts.ibmPlexSansArabic(),
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _busyId = null);
-    }
+    await _load();
   }
 
   Future<void> _setStatus(
@@ -219,13 +220,14 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
 
   Future<void> _reject(Listing listing) async {
     final noteCtrl = TextEditingController();
-    final step1 = await showDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) {
+        final c = Theme.of(ctx).colorScheme;
         return AlertDialog(
           title: Text(
-            'رفض الطلب — تأكيد 1 من 2',
-            style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
+            'رفض المنشور؟',
+            style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -238,9 +240,9 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
               const SizedBox(height: 12),
               TextField(
                 controller: noteCtrl,
-                maxLines: 3,
+                maxLines: 4,
                 decoration: InputDecoration(
-                  hintText: 'سبب الرفض (اختياري — يُحفظ مع الطلب)',
+                  hintText: 'سبب الرفض — يُرسل لصاحب المنشور عبر واتساب',
                   hintStyle: GoogleFonts.ibmPlexSansArabic(fontSize: 13),
                 ),
                 style: GoogleFonts.ibmPlexSansArabic(),
@@ -254,7 +256,11 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('متابعة إلى التأكيد النهائي'),
+              style: FilledButton.styleFrom(
+                backgroundColor: c.error,
+                foregroundColor: c.onError,
+              ),
+              child: const Text('رفض وإبلاغ'),
             ),
           ],
         );
@@ -262,59 +268,30 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
     );
     final note = noteCtrl.text.trim();
     noteCtrl.dispose();
-    if (step1 != true || !mounted) return;
-
-    final step2 = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        final c = Theme.of(ctx).colorScheme;
-        return AlertDialog(
-          title: Text(
-            'رفض الطلب — تأكيد 2 من 2',
-            style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
-          ),
+    if (ok != true || !mounted) return;
+    if (note.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
           content: Text(
-            'تأكيد نهائي لرفض هذا الطلب ولن يُنشر في الدليل.\n'
-            '${listing.area} ← ${listing.destination}'
-            '${note.isEmpty ? '' : '\nالسبب: $note'}',
-            style: GoogleFonts.ibmPlexSansArabic(height: 1.45),
+            'اكتب سبب الرفض قبل الإرسال',
+            style: GoogleFonts.ibmPlexSansArabic(),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('رجوع'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: c.error,
-                foregroundColor: c.onError,
-              ),
-              child: const Text('تأكيد نهائي: رفض'),
-            ),
-          ],
-        );
-      },
-    );
-    if (step2 != true || !mounted) return;
+        ),
+      );
+      return;
+    }
 
     setState(() => _busyId = listing.id);
     try {
       await ListingsRepository.shared.setStatus(
         id: listing.id,
         status: ListingStatus.rejected,
-        adminNote: note.isEmpty ? null : note,
+        adminNote: note,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text(
-            'تم رفض الطلب',
-            style: GoogleFonts.ibmPlexSansArabic(),
-          ),
-        ),
-      );
+      await _openRejectionWhatsApp(listing, note);
+      if (!mounted) return;
       await _load();
     } catch (_) {
       if (!mounted) return;
@@ -332,8 +309,43 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
     }
   }
 
+  Future<void> _openRejectionWhatsApp(Listing listing, String reason) async {
+    final message = listingRejectionNotice(
+      reference: listing.referenceCode ?? listing.id,
+      origin: listing.area,
+      destination: listing.destination,
+      reason: reason,
+    );
+    final url = ListingContact.whatsappUrl(
+      listing.contactPhone,
+      message: message,
+    );
+    if (url != null) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          'رُفض المنشور — لا يوجد واتساب لإبلاغ صاحب المنشور',
+          style: GoogleFonts.ibmPlexSansArabic(),
+        ),
+      ),
+    );
+  }
+
   String _completionMessageDraft(Listing listing) {
     final ref = listing.referenceCode ?? listing.id;
+    if (!listing.isDriver) {
+      return 'مرحباً، بخصوص طلبك للبحث عن خط في دليل خطوط بغداد.\n'
+          'رقم الطلب: $ref\n'
+          'المسار: ${listing.area} ← ${listing.destination}\n\n'
+          'لاحظنا أن بعض المعلومات ناقصة أو تحتاج تصحيحاً.\n'
+          'يرجى تزويدنا بالتفاصيل الصحيحة حتى نتمكن من إكمال مراجعة طلبك.\n'
+          'شكراً لتعاونك.';
+    }
     return 'مرحباً، بخصوص طلب نشر خطك في دليل خطوط بغداد.\n'
         'رقم الطلب: $ref\n'
         'المسار: ${listing.area} ← ${listing.destination}\n\n'
@@ -343,7 +355,41 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
         'شكراً لتعاونك.';
   }
 
-  Future<void> _messageToComplete(Listing listing) async {
+  String _paymentMessageDraft(Listing listing) {
+    final ref = listing.referenceCode ?? listing.id;
+    return 'مرحباً، بخصوص طلب نشر خطك في دليل خطوط بغداد.\n'
+        'رقم الطلب: $ref\n'
+        'المسار: ${listing.area} ← ${listing.destination}\n'
+        'تمت مراجعة طلبك والموافقة عليه.\n'
+        'لإكمال الدفع ونشر الخط في الدليل + النشر في مجموعة تلغرام، '
+        'يرجى إتمام رسوم النشر عبر هذه المحادثة والبالغة (5000 د.ع)\n'
+        'عبر كي كارد: 7118965883\n'
+        'او رصيد اسيا: 07760000989\n'
+        'ثم إعلامنا بتأكيد الدفع\n'
+        'شكراً لك.';
+  }
+
+  Future<void> _messageToComplete(Listing listing) {
+    return _messageDriver(
+      listing,
+      title: 'مراسلة السائق لإكمال البيانات',
+      draft: _completionMessageDraft(listing),
+    );
+  }
+
+  Future<void> _messageForPayment(Listing listing) {
+    return _messageDriver(
+      listing,
+      title: 'مراسلة لإكمال الدفع',
+      draft: _paymentMessageDraft(listing),
+    );
+  }
+
+  Future<void> _messageDriver(
+    Listing listing, {
+    required String title,
+    required String draft,
+  }) async {
     final phone = listing.contactPhone?.trim();
     final telegram = listing.contactTelegram?.trim();
     final hasPhone = phone != null && phone.isNotEmpty;
@@ -362,13 +408,13 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
       return;
     }
 
-    final msgCtrl = TextEditingController(text: _completionMessageDraft(listing));
+    final msgCtrl = TextEditingController(text: draft);
     final choice = await showDialog<String>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
           title: Text(
-            'مراسلة السائق لإكمال البيانات',
+            title,
             style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
           ),
           content: SizedBox(
@@ -425,7 +471,8 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
 
     await Clipboard.setData(ClipboardData(text: message));
     if (choice == 'whatsapp' && hasPhone) {
-      final digits = phone.replaceAll(RegExp(r'\D'), '');
+      final digits = PhoneDigits.forWhatsApp(phone);
+      if (digits == null) return;
       final uri = Uri.parse(
         'https://wa.me/$digits?text=${Uri.encodeComponent(message)}',
       );
@@ -449,7 +496,8 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
   Future<void> _openContact(Listing listing) async {
     final phone = listing.contactPhone?.trim();
     if (phone == null || phone.isEmpty) return;
-    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    final digits = PhoneDigits.forWhatsApp(phone);
+    if (digits == null) return;
     final uri = Uri.parse('https://wa.me/$digits');
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
@@ -459,8 +507,71 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
     final c = context.colors;
     final visible = _visible;
 
-    return Column(
+    return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final saved = await openAdminPublishFlow(context);
+          if (!mounted || saved == null) return;
+          setState(() {
+            _wantedOnly = saved.isDriver ? false : true;
+            AdminRequestsPage.preferRidersTab.value = _wantedOnly == true;
+          });
+          if (!mounted) return;
+          ScaffoldMessenger.of(this.context).showSnackBar(
+            SnackBar(
+              behavior: SnackBarBehavior.floating,
+              content: Text(
+                'تم نشر الإعلان في الدليل',
+                style: GoogleFonts.ibmPlexSansArabic(),
+              ),
+            ),
+          );
+          await _load();
+        },
+        icon: const Icon(Icons.publish_outlined),
+        label: Text(
+          'نشر',
+          style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w700),
+        ),
+      ),
+      body: Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: c.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: c.border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _TypeTab(
+                    label: 'الكل',
+                    selected: _wantedOnly == null,
+                    onTap: () => setState(() => _wantedOnly = null),
+                  ),
+                ),
+                Expanded(
+                  child: _TypeTab(
+                    label: UnifiedPostKind.available,
+                    selected: _wantedOnly == false,
+                    onTap: () => setState(() => _wantedOnly = false),
+                  ),
+                ),
+                Expanded(
+                  child: _TypeTab(
+                    label: UnifiedPostKind.wanted,
+                    selected: _wantedOnly == true,
+                    color: UnifiedPostKind.colorFor(ListingType.rider, c),
+                    onTap: () => setState(() => _wantedOnly = true),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
           child: TextField(
@@ -575,41 +686,18 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
                           return _RequestCard(
                             listing: listing,
                             busy: busy,
-                            onEdit: () => _edit(listing),
-                            onMessageComplete: () => _messageToComplete(listing),
-                            onCopyRef: () async {
-                              final ref =
-                                  listing.referenceCode ?? listing.id;
-                              await Clipboard.setData(ClipboardData(text: ref));
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  behavior: SnackBarBehavior.floating,
-                                  content: Text(
-                                    'نُسخ رقم الطلب',
-                                    style: GoogleFonts.ibmPlexSansArabic(),
-                                  ),
-                                ),
-                              );
-                            },
-                            onWhatsApp: () => _openContact(listing),
-                            onApproveReview: () => _setStatus(
-                              listing,
-                              ListingStatus.awaitingPayment,
-                              confirmTitle: 'موافقة على الطلب؟',
-                              confirmLabel: 'موافقة → انتظار الدفع',
-                            ),
-                            onConfirmPayment: () => _setStatus(
+                            onEdit: () => _openReview(listing),
+                            onPublish: () => _setStatus(
                               listing,
                               ListingStatus.published,
-                              confirmTitle: 'تأكيد الدفع والنشر؟',
-                              confirmLabel: 'نشر في الدليل',
+                              confirmTitle: 'نشر المنشور في الدليل؟',
+                              confirmLabel: 'نشر',
                             ),
                             onReject: () => _reject(listing),
                             onReopen: () => _setStatus(
                               listing,
                               ListingStatus.pendingReview,
-                              confirmTitle: 'إعادة الطلب للمراجعة؟',
+                              confirmTitle: 'إعادة المنشور للمراجعة؟',
                               confirmLabel: 'إعادة للمراجعة',
                             ),
                           );
@@ -618,6 +706,47 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
                     ),
         ),
       ],
+    ),
+    );
+  }
+}
+
+class _TypeTab extends StatelessWidget {
+  const _TypeTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.color,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final accent = color ?? c.primary;
+    return Material(
+      color: selected ? accent.withValues(alpha: 0.14) : Colors.transparent,
+      borderRadius: BorderRadius.circular(11),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(11),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 13,
+              color: selected ? accent : c.text.withValues(alpha: 0.75),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -657,11 +786,7 @@ class _RequestCard extends StatelessWidget {
     required this.listing,
     required this.busy,
     required this.onEdit,
-    required this.onMessageComplete,
-    required this.onCopyRef,
-    required this.onWhatsApp,
-    required this.onApproveReview,
-    required this.onConfirmPayment,
+    required this.onPublish,
     required this.onReject,
     required this.onReopen,
   });
@@ -669,11 +794,7 @@ class _RequestCard extends StatelessWidget {
   final Listing listing;
   final bool busy;
   final VoidCallback onEdit;
-  final VoidCallback onMessageComplete;
-  final VoidCallback onCopyRef;
-  final VoidCallback onWhatsApp;
-  final VoidCallback onApproveReview;
-  final VoidCallback onConfirmPayment;
+  final VoidCallback onPublish;
   final VoidCallback onReject;
   final VoidCallback onReopen;
 
@@ -681,172 +802,86 @@ class _RequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final ref = listing.referenceCode ?? listing.id;
-    final phone = listing.contactPhone?.trim();
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: c.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: c.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    final canDecide = listing.status == ListingStatus.pendingReview ||
+        listing.status == ListingStatus.awaitingPayment;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ListingCard(
+          listing: listing,
+          unifiedPublicCard: true,
+          showContactAction: true,
+        ),
+        const SizedBox(height: 8),
+        Row(
           children: [
-            Row(
-              children: [
-                Expanded(
+            Text(
+              'رقم الطلب: $ref · ${listing.statusLabel}',
+              style: GoogleFonts.ibmPlexSansArabic(
+                fontSize: 12,
+                color: c.text.withValues(alpha: 0.62),
+              ),
+            ),
+            if (busy) ...[
+              const SizedBox(width: 8),
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ],
+          ],
+        ),
+        if ((listing.adminNote ?? '').trim().isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            'ملاحظة: ${listing.adminNote}',
+            style: GoogleFonts.ibmPlexSansArabic(
+              fontSize: 12.5,
+              color: c.riderAccent,
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        if (canDecide)
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: busy ? null : onPublish,
+                  child: const Text('نشر'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: busy ? null : onEdit,
+                  child: const Text('تعديل'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: busy ? null : onReject,
                   child: Text(
-                    '${listing.area} ← ${listing.destination}',
-                    style: GoogleFonts.ibmPlexSansArabic(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                    ),
+                    'رفض',
+                    style: TextStyle(color: c.riderAccent),
                   ),
-                ),
-                if (busy)
-                  const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                _MetaChip(label: listing.statusLabel),
-                _MetaChip(label: listing.governorate),
-                _MetaChip(label: listing.scheduleLabel),
-                _MetaChip(label: listing.genderLabel),
-                if (listing.vehicleType != null &&
-                    listing.vehicleType!.trim().isNotEmpty)
-                  _MetaChip(label: listing.vehicleType!.trim()),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Text(
-                  'رقم الطلب: $ref',
-                  style: GoogleFonts.ibmPlexSansArabic(
-                    fontSize: 12.5,
-                    color: c.text.withValues(alpha: 0.7),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'نسخ',
-                  onPressed: onCopyRef,
-                  icon: const Icon(Icons.copy_rounded, size: 18),
-                ),
-              ],
-            ),
-            if (phone != null && phone.isNotEmpty)
-              Text(
-                'هاتف: $phone',
-                style: GoogleFonts.ibmPlexSansArabic(fontSize: 13),
-              ),
-            if ((listing.contactTelegram ?? '').trim().isNotEmpty)
-              Text(
-                'تلغرام: ${listing.contactTelegram}',
-                style: GoogleFonts.ibmPlexSansArabic(fontSize: 13),
-              ),
-            if ((listing.adminNote ?? '').trim().isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(
-                'ملاحظة: ${listing.adminNote}',
-                style: GoogleFonts.ibmPlexSansArabic(
-                  fontSize: 12.5,
-                  color: c.riderAccent,
                 ),
               ),
             ],
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: busy ? null : onEdit,
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: const Text('تعديل'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: busy ? null : onMessageComplete,
-                  icon: const Icon(Icons.mark_email_read_outlined, size: 18),
-                  label: const Text('مراسلة لإكمال البيانات'),
-                ),
-                if (phone != null && phone.isNotEmpty)
-                  OutlinedButton.icon(
-                    onPressed: busy ? null : onWhatsApp,
-                    icon: const Icon(Icons.chat_outlined, size: 18),
-                    label: const Text('واتساب'),
-                  ),
-                if (listing.status == ListingStatus.pendingReview) ...[
-                  FilledButton(
-                    onPressed: busy ? null : onApproveReview,
-                    child: const Text('موافقة → انتظار الدفع'),
-                  ),
-                  OutlinedButton(
-                    onPressed: busy ? null : onReject,
-                    child: Text(
-                      'رفض',
-                      style: TextStyle(color: c.riderAccent),
-                    ),
-                  ),
-                ],
-                if (listing.status == ListingStatus.awaitingPayment) ...[
-                  FilledButton(
-                    onPressed: busy ? null : onConfirmPayment,
-                    child: const Text('تأكيد الدفع ونشر'),
-                  ),
-                  OutlinedButton(
-                    onPressed: busy ? null : onReject,
-                    child: Text(
-                      'رفض',
-                      style: TextStyle(color: c.riderAccent),
-                    ),
-                  ),
-                ],
-                if (listing.status == ListingStatus.rejected)
-                  OutlinedButton(
-                    onPressed: busy ? null : onReopen,
-                    child: const Text('إعادة للمراجعة'),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MetaChip extends StatelessWidget {
-  const _MetaChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: c.background,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: c.border),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.ibmPlexSansArabic(
-          fontSize: 11.5,
-          color: c.text.withValues(alpha: 0.75),
-        ),
-      ),
+          )
+        else if (listing.status == ListingStatus.rejected)
+          OutlinedButton(
+            onPressed: busy ? null : onReopen,
+            child: const Text('إعادة للمراجعة'),
+          )
+        else
+          OutlinedButton(
+            onPressed: busy ? null : onEdit,
+            child: const Text('تعديل'),
+          ),
+      ],
     );
   }
 }

@@ -4,15 +4,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/models/listing.dart';
-import '../../../core/models/listing_subscription.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/phone_digits.dart';
 import '../../../data/listings_repository.dart';
 import '../widgets/admin_double_confirm.dart';
 
-enum _SubFilter { expired, endingSoon, active, hidden }
+enum _SubFilter { active, hidden }
 
-/// Admin tab: 30-day listing subscriptions — timings, expiry, renew/hide/delete.
+/// Admin tab: listing visibility — hide, delete, WhatsApp.
 class AdminSubscriptionsPage extends StatefulWidget {
   const AdminSubscriptionsPage({super.key});
 
@@ -21,17 +20,10 @@ class AdminSubscriptionsPage extends StatefulWidget {
 }
 
 class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
-  _SubFilter _filter = _SubFilter.expired;
+  _SubFilter _filter = _SubFilter.active;
   List<Listing> _items = const [];
   bool _loading = true;
   String? _busyId;
-
-  String _fmt(DateTime d) {
-    final l = d.toLocal();
-    return '${l.year.toString().padLeft(4, '0')}/'
-        '${l.month.toString().padLeft(2, '0')}/'
-        '${l.day.toString().padLeft(2, '0')}';
-  }
 
   @override
   void initState() {
@@ -52,13 +44,7 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
   List<Listing> get _filtered {
     return _items.where((l) {
       return switch (_filter) {
-        _SubFilter.expired => l.isExpired && !l.isHidden,
-        _SubFilter.endingSoon =>
-          !l.isExpired &&
-              !l.isHidden &&
-              l.wholeDaysLeft <= 7 &&
-              l.isPublished,
-        _SubFilter.active => l.isLiveInDirectory && l.wholeDaysLeft > 7,
+        _SubFilter.active => l.isLiveInDirectory,
         _SubFilter.hidden => l.isHidden,
       };
     }).toList();
@@ -66,15 +52,11 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
 
   String _expiryWhatsAppMessage(Listing listing) {
     final ref = listing.referenceCode ?? listing.id;
-    final end = _fmt(listing.effectiveExpiresAt);
-    return 'مرحباً، نود إبلاغك بأن اشتراك خطك في دليل خطوط بغداد '
-        'قد انتهى أو أوشك على الانتهاء.\n'
+    return 'مرحباً، بخصوص منشورك في دليل خطوط بغداد.\n'
         'المسار: ${listing.area} ← ${listing.destination}\n'
         'رقم الطلب: $ref\n'
-        'تاريخ انتهاء الظهور: $end\n'
-        'مدة الاشتراك: ${ListingSubscription.periodDays} يوماً.\n'
-        'لتجديد الظهور لمدة ${ListingSubscription.periodDays} يوماً '
-        'يُرجى إتمام رسوم التجديد والتواصل معنا.';
+        'آخر تحديث: ${listing.lastUpdateLabel}\n'
+        'يرجى مراجعة بيانات منشورك وتعديلها إن لزم.';
   }
 
   Future<void> _openExpiryWhatsApp(Listing listing) async {
@@ -102,12 +84,12 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
   }
 
   Future<void> _renew(Listing listing) async {
-    final ok = await AdminDoubleConfirm.show(
+    final ok = await AdminDoubleConfirm.showDouble(
       context,
-      title: 'تجديد الاشتراك؟',
+      title: 'تحديث المنشور؟',
       detail:
-          '${listing.area} ← ${listing.destination}\nسيُمدَّد الظهور ${ListingSubscription.periodDays} يوماً بعد تأكيد الدفع.',
-      confirmLabel: 'تجديد 30 يوماً',
+          '${listing.area} ← ${listing.destination}\nسيُحدَّث تاريخ آخر ظهور للمنشور.',
+      confirmLabel: 'تحديث',
     );
     if (!ok || !mounted) return;
 
@@ -119,7 +101,7 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           content: Text(
-            'تم التجديد لمدة ${ListingSubscription.periodDays} يوماً',
+            'تم تحديث تاريخ الظهور',
             style: GoogleFonts.ibmPlexSansArabic(),
           ),
         ),
@@ -131,7 +113,7 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           content: Text(
-            'تعذر التجديد',
+            'تعذر التحديث',
             style: GoogleFonts.ibmPlexSansArabic(),
           ),
         ),
@@ -142,10 +124,10 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
   }
 
   Future<void> _hide(Listing listing) async {
-    final ok = await AdminDoubleConfirm.show(
+    final ok = await AdminDoubleConfirm.showDouble(
       context,
       title: 'إخفاء الخط من الدليل؟',
-      detail: '${listing.area} ← ${listing.destination}\nسيختفي عن العامة ويمكن إظهاره لاحقاً بالتجديد.',
+      detail: '${listing.area} ← ${listing.destination}\nسيختفي عن العامة ويمكن إظهاره لاحقاً.',
       confirmLabel: 'إخفاء',
       destructive: true,
     );
@@ -173,7 +155,7 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
   }
 
   Future<void> _delete(Listing listing) async {
-    final ok = await AdminDoubleConfirm.show(
+    final ok = await AdminDoubleConfirm.showDouble(
       context,
       title: 'حذف الخط نهائياً؟',
       detail:
@@ -214,7 +196,7 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
           child: Text(
-            'صلاحية كل خط ${ListingSubscription.periodDays} يوماً من تاريخ النشر أو التجديد',
+            'يُعتمد آخر تحديث للمنشور. يبقى ظاهراً حتى يُحذف.',
             style: GoogleFonts.ibmPlexSansArabic(
               fontSize: 12.5,
               color: c.text.withValues(alpha: 0.6),
@@ -227,17 +209,7 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
           child: Row(
             children: [
               _Chip(
-                label: 'منتهية',
-                selected: _filter == _SubFilter.expired,
-                onTap: () => setState(() => _filter = _SubFilter.expired),
-              ),
-              _Chip(
-                label: 'تنتهي خلال 7 أيام',
-                selected: _filter == _SubFilter.endingSoon,
-                onTap: () => setState(() => _filter = _SubFilter.endingSoon),
-              ),
-              _Chip(
-                label: 'سارية',
+                label: 'ظاهرة',
                 selected: _filter == _SubFilter.active,
                 onTap: () => setState(() => _filter = _SubFilter.active),
               ),
@@ -271,18 +243,13 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
                         itemBuilder: (context, i) {
                           final listing = filtered[i];
                           final busy = _busyId == listing.id;
-                          final start = _fmt(listing.subscriptionStart);
-                          final end = _fmt(listing.effectiveExpiresAt);
-                          final days = listing.isExpired
-                              ? 'منتهٍ'
-                              : 'متبقي ${listing.wholeDaysLeft} يوم';
 
                           return DecoratedBox(
                             decoration: BoxDecoration(
                               color: c.surface,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: listing.isExpired || listing.isHidden
+                                color: listing.isHidden
                                     ? c.riderAccent.withValues(alpha: 0.45)
                                     : c.border,
                               ),
@@ -315,14 +282,14 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'الحالة: ${listing.statusLabel} · $days',
+                                    'الحالة: ${listing.statusLabel}',
                                     style: GoogleFonts.ibmPlexSansArabic(
                                       fontSize: 12.5,
                                       color: c.text.withValues(alpha: 0.72),
                                     ),
                                   ),
                                   Text(
-                                    'من $start → إلى $end',
+                                    listing.lastUpdateLabel,
                                     style: GoogleFonts.ibmPlexSansArabic(
                                       fontSize: 12.5,
                                       color: c.text.withValues(alpha: 0.72),
@@ -351,12 +318,12 @@ class _AdminSubscriptionsPageState extends State<AdminSubscriptionsPage> {
                                           Icons.chat_outlined,
                                           size: 18,
                                         ),
-                                        label: const Text('واتساب انتهاء'),
+                                        label: const Text('واتساب'),
                                       ),
                                       FilledButton(
                                         onPressed:
                                             busy ? null : () => _renew(listing),
-                                        child: const Text('تجديد 30 يوماً'),
+                                        child: const Text('تحديث الظهور'),
                                       ),
                                       OutlinedButton(
                                         onPressed: busy || listing.isHidden

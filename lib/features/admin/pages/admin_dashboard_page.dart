@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../core/activity/directory_activity.dart';
 import '../../../core/models/admin_report.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/admin_repository.dart';
@@ -63,7 +64,25 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             runSpacing: 12,
             children: [
               _StatCard(
-                title: 'الإعلانات',
+                title: 'المستخدمون',
+                value: DirectoryActivity.formatCount(s.directoryUsers),
+                subtitle: DirectoryActivity.progressDelta(s.directoryUsers) == 0
+                    ? 'رصد التقدم من ${DirectoryActivity.formatCount(DirectoryActivity.progressFloor)}'
+                    : '+${DirectoryActivity.formatCount(DirectoryActivity.progressDelta(s.directoryUsers))} منذ ${DirectoryActivity.formatCount(DirectoryActivity.progressFloor)}',
+                wide: true,
+              ),
+              _StatCard(
+                title: 'خطوط السائقين',
+                value: '${s.drivers}',
+                onTap: () => widget.onOpenTab(3),
+              ),
+              _StatCard(
+                title: 'طلبات الخطوط',
+                value: '${s.riders}',
+                onTap: () => widget.onOpenTab(3),
+              ),
+              _StatCard(
+                title: 'المنشورات الظاهرة',
                 value: '${s.listingsTotal}',
                 onTap: () => widget.onOpenTab(3),
               ),
@@ -71,11 +90,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 title: 'المناطق',
                 value: '${s.placesTotal}',
                 onTap: () => widget.onOpenTab(9),
-              ),
-              _StatCard(
-                title: 'حسابات منشورة',
-                value: '${s.publisherAccountsTotal}',
-                onTap: () => widget.onOpenTab(3),
               ),
               _StatCard(
                 title: 'تثبيتات الهاتف',
@@ -103,15 +117,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ),
           const SizedBox(height: 10),
           _ShortcutTile(
-            title: 'طلبات الدليل',
-            subtitle: 'مراجعة، انتظار الدفع، نشر أو رفض',
-            icon: Icons.inbox_outlined,
+            title: 'مراجعة المنشورات',
+            subtitle: 'بطاقة كاملة — نشر أو تعديل أو رفض',
+            icon: Icons.fact_check_outlined,
             onTap: () => widget.onOpenTab(1),
           ),
           const SizedBox(height: 8),
           _ShortcutTile(
-            title: 'الاشتراكات',
-            subtitle: 'صلاحية 30 يوماً — تجديد، إخفاء، حذف، واتساب',
+            title: 'متابعة المنشورات',
+            subtitle: 'آخر تحديث، إخفاء، حذف',
             icon: Icons.event_available_outlined,
             onTap: () => widget.onOpenTab(2),
           ),
@@ -188,19 +202,23 @@ class _StatCard extends StatelessWidget {
   const _StatCard({
     required this.title,
     required this.value,
+    this.subtitle,
     this.onTap,
+    this.wide = false,
   });
 
   final String title;
   final String value;
+  final String? subtitle;
   final VoidCallback? onTap;
+  final bool wide;
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final stripe = c.primary;
     return SizedBox(
-      width: 150,
+      width: wide ? 312 : 150,
       child: Material(
         color: c.surface,
         child: InkWell(
@@ -239,6 +257,17 @@ class _StatCard extends StatelessWidget {
                             color: c.text.withValues(alpha: 0.65),
                           ),
                         ),
+                        if (subtitle != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle!,
+                            style: GoogleFonts.ibmPlexSansArabic(
+                              fontSize: 11.5,
+                              height: 1.35,
+                              color: c.text.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

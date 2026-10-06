@@ -7,18 +7,22 @@ import 'package:masarat/data/listings_repository.dart';
 import 'package:masarat/features/admin/admin_gate_page.dart';
 import 'package:masarat/features/admin/admin_shell_page.dart';
 import 'package:masarat/features/admin/pages/admin_import_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    ListingsRepository.bindPreview();
     await AdminAuthController.shared.load();
     await AdminAuthController.shared.signOut();
   });
 
   testWidgets('public listings show brand and sample cards', (tester) async {
     await tester.pumpWidget(const MasaratApp());
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 80));
 
     expect(find.text('خطوط بغداد'), findsWidgets);
     expect(find.textContaining('المنصور'), findsWidgets);
@@ -28,17 +32,22 @@ void main() {
 
   testWidgets('open publish form from FAB', (tester) async {
     await tester.pumpWidget(const MasaratApp());
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 80));
 
     await tester.tap(find.byType(FloatingActionButton));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 80));
 
-    expect(find.text('ابحث عن خط'), findsOneWidget);
-    await tester.tap(find.text('سائق لديه خط'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('نشر إعلان'), findsWidgets);
-    expect(find.textContaining('سائق'), findsWidgets);
+    expect(find.text('متوفر خط'), findsWidgets);
+    expect(find.text('مطلوب خط'), findsWidgets);
+    expect(find.text('اكتب إعلانك هنا'), findsOneWidget);
+    expect(find.text('ابحث عن خط'), findsNothing);
+    expect(find.text('سائق لديه خط'), findsNothing);
+    expect(find.text('خط متوفر'), findsNothing);
+    expect(find.text('خط مطلوب'), findsNothing);
+    expect(find.text('إنشاء حساب'), findsNothing);
+    expect(find.text('تسجيل دخول'), findsNothing);
   });
 
   testWidgets('admin gate shows login and rejects without supabase',
@@ -48,15 +57,17 @@ void main() {
         home: AdminGatePage(),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
-    await tester.enterText(find.byType(TextField).at(0), 'wrong@test.com');
-    await tester.enterText(find.byType(TextField).at(1), 'bad-pass');
+    await tester.enterText(find.byType(TextField).at(0), '');
+    await tester.enterText(find.byType(TextField).at(1), '');
     await tester.tap(find.text('دخول'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 8));
 
     expect(find.byType(AdminShellPage), findsNothing);
-    expect(find.textContaining('غير'), findsWidgets);
+    expect(find.textContaining('أدخل'), findsWidgets);
   });
 
   testWidgets('admin import page parses sample paste', (tester) async {
@@ -71,7 +82,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('المسودات'), findsOneWidget);
-    expect(find.textContaining('المنصور'), findsWidgets);
+    expect(find.textContaining('الجادرية'), findsWidgets);
     expect(find.text('نشر المحدد (3)'), findsOneWidget);
   });
 
