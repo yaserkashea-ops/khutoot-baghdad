@@ -24,7 +24,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 80));
 
-    expect(find.text('خطوط بغداد'), findsWidgets);
+    expect(find.text('دليل خطوط بغداد'), findsWidgets);
     expect(find.textContaining('المنصور'), findsWidgets);
     expect(find.byType(FloatingActionButton), findsOneWidget);
     expect(find.byKey(const Key('install_home_icon')), findsOneWidget);

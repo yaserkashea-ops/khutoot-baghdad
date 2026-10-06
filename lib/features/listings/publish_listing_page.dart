@@ -680,12 +680,12 @@ class _PublishListingPageState extends State<PublishListingPage> {
       builder: (ctx) {
         return AlertDialog(
           title: Text(
-            'تم إرسال المنشور',
+            'تم إرسال منشورك بنجاح',
             style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
           ),
           content: Text(
             'رقم الطلب: $ref\n\n'
-            'تم إرسال منشورك للمراجعة والموافقة، وسيظهر في الدليل بعد اعتماده.',
+            'وسيتم نشره في الدليل بعد الموافقة عليه',
             style: GoogleFonts.ibmPlexSansArabic(height: 1.5),
           ),
           actions: [

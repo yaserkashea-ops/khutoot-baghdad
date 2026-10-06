@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/config/app_hosts.dart';
 import '../../../core/config/directory_launch.dart';
+import '../../../core/listings/legacy_listing_adapter.dart';
+import '../../../core/listings/unified_post_kind.dart';
 import '../../../core/models/listing.dart';
+import '../../../core/utils/phone_digits.dart';
 
 /// بطاقة مشاركة — عرض ثابت، والارتفاع يتسع للمحتوى (حد أدنى 4:5) حتى لا تُقصّ.
 class ListingSharePoster extends StatelessWidget {
@@ -34,12 +38,10 @@ class ListingSharePoster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final phone = listing.contactPhone?.trim();
+    final view = LegacyListingAdapter.toView(listing);
+    final phone = PhoneDigits.forDisplay(listing.contactPhone);
     final telegram = listing.contactTelegram?.trim();
-    final vehicle = listing.vehicleType?.trim();
-    final seats = listing.seatsCount;
-    final dep = listing.departureTime?.trim();
-    final ret = listing.returnTime?.trim();
+    final body = (view.body ?? '').trim();
     final scale = width / 360;
 
     return Directionality(
@@ -73,7 +75,7 @@ class ListingSharePoster extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          listing.isDriver ? 'يتوفر خط' : 'مطلوب خط',
+                          UnifiedPostKind.labelFor(listing.type),
                           textAlign: TextAlign.center,
                           style: GoogleFonts.ibmPlexSansArabic(
                             fontSize: 12 * scale,
@@ -148,18 +150,21 @@ class ListingSharePoster extends StatelessWidget {
                             _Chip(listing.timePeriodLabel, scale: scale),
                             if (listing.publicGenderLabel != null)
                               _Chip(listing.publicGenderLabel!, scale: scale),
-                            if (dep != null && dep.isNotEmpty)
-                              _Chip('انطلاق $dep', scale: scale),
-                            if (ret != null && ret.isNotEmpty)
-                              _Chip('عودة $ret', scale: scale),
-                            if (listing.isDriver &&
-                                vehicle != null &&
-                                vehicle.isNotEmpty)
-                              _Chip('نوع السيارة: $vehicle', scale: scale),
-                            if (seats != null && seats > 0)
-                              _Chip('$seats مقاعد', scale: scale),
                           ],
                         ),
+                        if (body.isNotEmpty) ...[
+                          SizedBox(height: 12 * scale),
+                          Text(
+                            body,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.ibmPlexSansArabic(
+                              fontSize: 14 * scale,
+                              height: 1.45,
+                              fontWeight: FontWeight.w600,
+                              color: _ink,
+                            ),
+                          ),
+                        ],
                         SizedBox(height: 14 * scale),
                         _SoftBox(
                           scale: scale,
@@ -219,25 +224,8 @@ class ListingSharePoster extends StatelessWidget {
                                   ),
                                 ),
                         ),
-                        SizedBox(height: 14 * scale),
-                        Text(
-                          AppHosts.publicUrl,
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.manrope(
-                            fontSize: 11 * scale,
-                            fontWeight: FontWeight.w600,
-                            color: _muted,
-                          ),
-                        ),
-                        SizedBox(height: 2 * scale),
-                        Text(
-                          'ابحث عن خطوط بغداد وأضف خطك',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.ibmPlexSansArabic(
-                            fontSize: 11 * scale,
-                            color: _muted,
-                          ),
-                        ),
+                        SizedBox(height: 16 * scale),
+                        _AppQrFooter(scale: scale),
                       ],
                     ),
                   ),
@@ -247,6 +235,63 @@ class ListingSharePoster extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AppQrFooter extends StatelessWidget {
+  const _AppQrFooter({required this.scale});
+
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    final qrSize = 64 * scale;
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.all(6 * scale),
+          decoration: BoxDecoration(
+            color: ListingSharePoster._surface,
+            borderRadius: BorderRadius.circular(12 * scale),
+            border: Border.all(color: ListingSharePoster._line),
+          ),
+          child: QrImageView(
+            data: AppHosts.publicUrl,
+            size: qrSize,
+            backgroundColor: ListingSharePoster._surface,
+            padding: EdgeInsets.zero,
+            eyeStyle: const QrEyeStyle(
+              eyeShape: QrEyeShape.square,
+              color: ListingSharePoster._primary,
+            ),
+            dataModuleStyle: const QrDataModuleStyle(
+              dataModuleShape: QrDataModuleShape.square,
+              color: ListingSharePoster._primary,
+            ),
+          ),
+        ),
+        SizedBox(height: 8 * scale),
+        Text(
+          'امسح الباركود لفتح دليل خطوط بغداد',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.ibmPlexSansArabic(
+            fontSize: 12 * scale,
+            fontWeight: FontWeight.w700,
+            color: ListingSharePoster._primary,
+          ),
+        ),
+        SizedBox(height: 2 * scale),
+        Text(
+          AppHosts.publicOrigin,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.ibmPlexSansArabic(
+            fontSize: 10.5 * scale,
+            fontWeight: FontWeight.w500,
+            color: ListingSharePoster._muted,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -117,7 +117,7 @@ void main() {
     await tester.pumpWidget(_wrap(const UnifiedFeedPage()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 80));
-    expect(find.text('خطوط بغداد'), findsWidgets);
+    expect(find.text('دليل خطوط بغداد'), findsWidgets);
     expect(find.text('ابحث في الإعلانات'), findsOneWidget);
     expect(find.text('اكتب إعلاناً'), findsOneWidget);
     expect(find.text('متوفر خط'), findsWidgets);
@@ -379,6 +379,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 80));
     expect(ThemeController.shared.mode, ThemeMode.dark);
     expect(find.byIcon(Icons.light_mode_outlined), findsOneWidget);
-    expect(find.text('خطوط بغداد'), findsWidgets);
+    expect(find.text('دليل خطوط بغداد'), findsWidgets);
   });
 }

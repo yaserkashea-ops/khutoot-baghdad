@@ -1,12 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/listings/unified_post_kind.dart';
 import '../../core/listings/unified_search_query.dart';
 import '../../core/models/listing.dart';
-import '../../core/prefs/ux_prefs.dart';
 import '../../core/pwa/install_app_button.dart';
 import '../../core/pwa/pwa_install.dart';
+import '../../core/pwa/share_app_button.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_toggle_button.dart';
 import '../../data/listings_repository.dart';
@@ -32,19 +34,27 @@ class _UnifiedFeedPageState extends State<UnifiedFeedPage> {
   bool _loading = true;
   _FeedKindFilter _kind = _FeedKindFilter.all;
   UnifiedSearchQuery? _query;
-  bool _showInstall = false;
+  bool _showInstall = !PwaInstall.isStandalone;
   bool _showBackToTop = false;
+  StreamSubscription<void>? _installStateSub;
+  StreamSubscription<String>? _installOutcomeSub;
 
   @override
   void initState() {
     super.initState();
     _scroll.addListener(_onScroll);
     _load();
+    _installStateSub = PwaInstall.onStateChanged.listen((_) => _syncInstall());
+    _installOutcomeSub = PwaInstall.onInstallOutcome.listen((outcome) {
+      if (outcome == 'accepted') _syncInstall();
+    });
     _syncInstall();
   }
 
   @override
   void dispose() {
+    _installStateSub?.cancel();
+    _installOutcomeSub?.cancel();
     _scroll.removeListener(_onScroll);
     _scroll.dispose();
     _search.dispose();
@@ -67,18 +77,10 @@ class _UnifiedFeedPageState extends State<UnifiedFeedPage> {
     );
   }
 
-  Future<void> _syncInstall() async {
-    final dismissed = await UxPrefs.isDismissed(UxPrefs.installCardKey);
-    if (!mounted) return;
-    setState(() {
-      _showInstall = !PwaInstall.isStandalone && !dismissed;
-    });
-  }
-
-  Future<void> _dismissInstall() async {
-    await UxPrefs.dismiss(UxPrefs.installCardKey);
-    if (!mounted) return;
-    setState(() => _showInstall = false);
+  void _syncInstall() {
+    final show = !PwaInstall.isStandalone;
+    if (!mounted || show == _showInstall) return;
+    setState(() => _showInstall = show);
   }
 
   Future<void> _load() async {
@@ -137,16 +139,38 @@ class _UnifiedFeedPageState extends State<UnifiedFeedPage> {
       backgroundColor: c.background,
       appBar: AppBar(
         centerTitle: true,
-        title: Text(
-          'خطوط بغداد',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            'دليل خطوط بغداد',
+            maxLines: 1,
+            softWrap: false,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
         ),
+        actionsPadding: const EdgeInsetsDirectional.only(end: 2),
         actions: [
-          const ThemeToggleButton(),
-          const InstallAppIconButton(),
+          IconButtonTheme(
+            data: IconButtonThemeData(
+              style: IconButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(8),
+                minimumSize: const Size(40, 40),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ShareAppIconButton(),
+                ThemeToggleButton(),
+                InstallAppIconButton(),
+              ],
+            ),
+          ),
           IconButton(
             tooltip: 'التواصل مع الإدارة',
             onPressed: () => showContactAdminSheet(context),
@@ -227,15 +251,12 @@ class _UnifiedFeedPageState extends State<UnifiedFeedPage> {
                     ),
                     if (_showInstall) ...[
                       const SizedBox(height: 10),
-                      InstallAppCard(
-                        onInstalled: _syncInstall,
-                        onDismiss: _dismissInstall,
-                      ),
+                      InstallAppCard(onInstalled: _syncInstall),
                     ],
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: 6,
+                      runSpacing: 6,
                       children: [
                         _Chip(
                           label: 'الكل',
@@ -333,19 +354,20 @@ class _Chip extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 16, color: selected ? tint : c.text),
-                const SizedBox(width: 5),
+                Icon(icon, size: 13, color: selected ? tint : c.text),
+                const SizedBox(width: 4),
               ],
               Text(
                 label,
                 style: GoogleFonts.ibmPlexSansArabic(
                   fontWeight: FontWeight.w600,
-                  fontSize: 13,
+                  fontSize: 11.5,
+                  height: 1.1,
                   color: selected ? tint : c.text,
                 ),
               ),

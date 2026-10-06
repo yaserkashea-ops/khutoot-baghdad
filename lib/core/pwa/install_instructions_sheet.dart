@@ -64,7 +64,7 @@ class InstallInstructionsSheet extends StatelessWidget {
             Icon(Icons.app_shortcut_outlined, size: 40, color: c.primary),
             const SizedBox(height: 10),
             Text(
-              'ثبّت خطوط بغداد',
+              'ثبّت دليل خطوط بغداد',
               textAlign: TextAlign.center,
               style: GoogleFonts.ibmPlexSansArabic(
                 fontWeight: FontWeight.w700,
@@ -73,7 +73,7 @@ class InstallInstructionsSheet extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'ثبّت خطوط بغداد على الشاشة الرئيسية للوصول السريع كل يوم.',
+              'ثبّت دليل خطوط بغداد على الشاشة الرئيسية للوصول السريع كل يوم.',
               textAlign: TextAlign.center,
               style: GoogleFonts.ibmPlexSansArabic(
                 fontSize: 13,

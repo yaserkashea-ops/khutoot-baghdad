@@ -38,6 +38,13 @@ abstract final class PhoneDigits {
     return '0${n.substring(3)}';
   }
 
+  /// Number shown on cards: local 07… never +964 / 964.
+  static String forDisplay(String? raw) {
+    final local = iraqLocal(raw);
+    if (local != null) return local;
+    return (raw ?? '').trim();
+  }
+
   /// Digits safe for `https://wa.me/…` (always prefers 964 for local Iraq).
   static String? forWhatsApp(String? raw) {
     final n = normalize(raw ?? '');

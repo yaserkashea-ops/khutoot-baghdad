@@ -141,17 +141,59 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
 
   Future<void> _openReview(Listing listing) async {
     final edited = await openAdminListingReview(context, listing);
-    if (edited == null || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text(
-          'تم حفظ تعديل الطلب',
-          style: GoogleFonts.ibmPlexSansArabic(),
+    if (!mounted) return;
+    if (edited != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'تم حفظ تعديل الطلب',
+            style: GoogleFonts.ibmPlexSansArabic(),
+          ),
         ),
-      ),
-    );
+      );
+    }
     await _load();
+  }
+
+  Future<void> _delete(Listing listing) async {
+    final ok = await AdminDoubleConfirm.showDouble(
+      context,
+      title: 'حذف المنشور؟',
+      detail:
+          '${listing.area} ← ${listing.destination}\nسيُحذف نهائياً ولن يظهر في الدليل.',
+      confirmLabel: 'حذف',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+    setState(() => _busyId = listing.id);
+    try {
+      await ListingsRepository.shared.deleteById(listing.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'تم حذف المنشور',
+            style: GoogleFonts.ibmPlexSansArabic(),
+          ),
+        ),
+      );
+      await _load();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'تعذر الحذف',
+            style: GoogleFonts.ibmPlexSansArabic(),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busyId = null);
+    }
   }
 
   Future<void> _setStatus(
@@ -694,6 +736,7 @@ class _AdminRequestsPageState extends State<AdminRequestsPage> {
                               confirmLabel: 'نشر',
                             ),
                             onReject: () => _reject(listing),
+                            onDelete: () => _delete(listing),
                             onReopen: () => _setStatus(
                               listing,
                               ListingStatus.pendingReview,
@@ -788,6 +831,7 @@ class _RequestCard extends StatelessWidget {
     required this.onEdit,
     required this.onPublish,
     required this.onReject,
+    required this.onDelete,
     required this.onReopen,
   });
 
@@ -796,6 +840,7 @@ class _RequestCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onPublish;
   final VoidCallback onReject;
+  final VoidCallback onDelete;
   final VoidCallback onReopen;
 
   @override
@@ -843,7 +888,7 @@ class _RequestCard extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 8),
-        if (canDecide)
+        if (canDecide) ...[
           Row(
             children: [
               Expanded(
@@ -870,16 +915,56 @@ class _RequestCard extends StatelessWidget {
                 ),
               ),
             ],
-          )
-        else if (listing.status == ListingStatus.rejected)
+          ),
+          const SizedBox(height: 8),
           OutlinedButton(
-            onPressed: busy ? null : onReopen,
-            child: const Text('إعادة للمراجعة'),
+            onPressed: busy ? null : onDelete,
+            child: Text(
+              'حذف',
+              style: TextStyle(color: c.riderAccent, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ] else if (listing.status == ListingStatus.rejected)
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: busy ? null : onReopen,
+                  child: const Text('إعادة للمراجعة'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: busy ? null : onDelete,
+                  child: Text(
+                    'حذف',
+                    style: TextStyle(color: c.riderAccent),
+                  ),
+                ),
+              ),
+            ],
           )
         else
-          OutlinedButton(
-            onPressed: busy ? null : onEdit,
-            child: const Text('تعديل'),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: busy ? null : onEdit,
+                  child: const Text('تعديل'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: busy ? null : onDelete,
+                  child: Text(
+                    'حذف',
+                    style: TextStyle(color: c.riderAccent),
+                  ),
+                ),
+              ),
+            ],
           ),
       ],
     );

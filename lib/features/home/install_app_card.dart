@@ -65,7 +65,7 @@ class InstallAppCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'ثبّت خطوط بغداد على شاشة هاتفك',
+                        'ثبّت دليل خطوط بغداد على شاشة هاتفك',
                         style: GoogleFonts.ibmPlexSansArabic(
                           fontWeight: FontWeight.w600,
                           fontSize: 13.5,

@@ -156,8 +156,8 @@ class _AdminDuplicatesPageState extends State<AdminDuplicatesPage> {
   }
 
   Future<void> _edit(Listing listing) async {
-    final saved = await openAdminListingReview(context, listing);
-    if (saved != null) await _load();
+    await openAdminListingReview(context, listing);
+    if (mounted) await _load();
   }
 
   Future<void> _deleteSelected() async {

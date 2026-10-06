@@ -60,6 +60,8 @@ void main() {
     expect(find.text('متوفر خط'), findsWidgets);
     expect(find.text('مطلوب خط'), findsWidgets);
     expect(find.text('صباحي'), findsWidgets);
+    expect(find.text('حذف'), findsWidgets);
+    expect(find.text('حذف المنشور'), findsOneWidget);
   });
 
   testWidgets('admin compose uses the unified sheet', (tester) async {

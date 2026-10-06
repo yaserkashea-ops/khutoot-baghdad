@@ -27,9 +27,9 @@ Future<Listing?> showUnifiedComposeSheet(
   );
 }
 
-const guestSubmitReceivedTitle = 'تم إرسال المنشور';
+const guestSubmitReceivedTitle = 'تم إرسال منشورك بنجاح';
 const guestSubmitReceivedBody =
-    'تم إرسال منشورك للمراجعة والموافقة، وسيظهر في الدليل بعد اعتماده.';
+    'وسيتم نشره في الدليل بعد الموافقة عليه';
 
 Future<void> showGuestSubmitReceivedDialog(BuildContext context) {
   return showDialog<void>(

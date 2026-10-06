@@ -10,6 +10,7 @@ import '../../../core/utils/phone_digits.dart';
 import '../../../data/listings_repository.dart';
 import '../../feed/place_suggest_field.dart';
 import '../../listings/widgets/listing_card.dart';
+import '../widgets/admin_double_confirm.dart';
 
 /// Admin desk to correct a unified listing: route, time, free text, contact.
 Future<Listing?> openAdminListingReview(
@@ -41,6 +42,7 @@ class _AdminListingReviewPageState extends State<AdminListingReviewPage> {
   late final TextEditingController _phone;
   late final TextEditingController _telegram;
   bool _saving = false;
+  bool _deleting = false;
 
   Listing get _source => widget.listing;
 
@@ -137,6 +139,30 @@ class _AdminListingReviewPageState extends State<AdminListingReviewPage> {
     }
   }
 
+  Future<void> _delete() async {
+    if (_saving || _deleting) return;
+    final ok = await AdminDoubleConfirm.showDouble(
+      context,
+      title: 'حذف المنشور؟',
+      detail:
+          '${_source.area} ← ${_source.destination}\nسيُحذف نهائياً ولن يظهر في الدليل.',
+      confirmLabel: 'حذف',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+    setState(() => _deleting = true);
+    try {
+      await ListingsRepository.shared.deleteById(_source.id);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (!mounted) return;
+      _toast('تعذر الحذف');
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
   void _toast(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -157,6 +183,18 @@ class _AdminListingReviewPageState extends State<AdminListingReviewPage> {
           'تعديل المنشور',
           style: GoogleFonts.ibmPlexSansArabic(fontWeight: FontWeight.w600),
         ),
+        actions: [
+          TextButton(
+            onPressed: (_saving || _deleting) ? null : _delete,
+            child: Text(
+              'حذف',
+              style: GoogleFonts.ibmPlexSansArabic(
+                color: c.riderAccent,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -307,9 +345,25 @@ class _AdminListingReviewPageState extends State<AdminListingReviewPage> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: FilledButton(
-                onPressed: _saving ? null : _save,
-                child: Text(_saving ? 'جاري الحفظ' : 'حفظ التعديلات'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton(
+                    onPressed: (_saving || _deleting) ? null : _save,
+                    child: Text(_saving ? 'جاري الحفظ' : 'حفظ التعديلات'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: (_saving || _deleting) ? null : _delete,
+                    child: Text(
+                      _deleting ? 'جاري الحذف' : 'حذف المنشور',
+                      style: TextStyle(
+                        color: c.riderAccent,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

@@ -118,7 +118,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           const SizedBox(height: 10),
           _ShortcutTile(
             title: 'مراجعة المنشورات',
-            subtitle: 'بطاقة كاملة — نشر أو تعديل أو رفض',
+            subtitle: 'بطاقة كاملة — نشر أو تعديل أو رفض أو حذف',
             icon: Icons.fact_check_outlined,
             onTap: () => widget.onOpenTab(1),
           ),

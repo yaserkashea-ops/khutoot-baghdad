@@ -43,6 +43,7 @@ dependencies:
   supabase_flutter: ^2.9.1
   share_plus: ^13.3.0
   gal: ^2.3.3
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

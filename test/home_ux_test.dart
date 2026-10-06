@@ -34,7 +34,7 @@ void main() {
     await tester.pumpWidget(_wrap(const UnifiedFeedPage()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 80));
-    expect(find.text('خطوط بغداد'), findsWidgets);
+    expect(find.text('دليل خطوط بغداد'), findsWidgets);
     expect(find.text('إنشاء حساب'), findsNothing);
     expect(find.text('تسجيل دخول'), findsNothing);
   });
@@ -46,9 +46,22 @@ void main() {
     expect(find.text('ابحث في الإعلانات'), findsOneWidget);
     expect(find.text('اكتب إعلاناً'), findsOneWidget);
     expect(find.byIcon(Icons.dark_mode_outlined), findsOneWidget);
-    expect(find.text('ثبّت خطوط بغداد على شاشة هاتفك'), findsOneWidget);
+    expect(find.byTooltip('مشاركة التطبيق'), findsOneWidget);
+    expect(find.text('ثبّت دليل خطوط بغداد على شاشة هاتفك'), findsOneWidget);
     expect(find.text('عرض الخطوط'), findsNothing);
     expect(find.text('أنا طالب/موظف'), findsNothing);
+  });
+
+  testWidgets('install card stays visible even if previously dismissed',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'khutoot_home_install_card_dismissed_v1': true,
+    });
+    await tester.pumpWidget(_wrap(const UnifiedFeedPage()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(find.text('ثبّت دليل خطوط بغداد على شاشة هاتفك'), findsOneWidget);
+    expect(find.byTooltip('إغلاق'), findsNothing);
   });
 
   testWidgets('install instructions can be dismissed', (tester) async {
@@ -66,7 +79,7 @@ void main() {
     );
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    expect(find.text('ثبّت خطوط بغداد'), findsOneWidget);
+    expect(find.text('ثبّت دليل خطوط بغداد'), findsOneWidget);
     expect(find.text('فهمت'), findsOneWidget);
     await tester.tap(find.text('فهمت'));
     await tester.pumpAndSettle();
