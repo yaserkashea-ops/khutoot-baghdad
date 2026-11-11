@@ -10,46 +10,60 @@ import {
   buildOrderTimeline,
   chefById,
   DELIVERY_FEE_IQD,
+  FREE_DELIVERY_FROM_IQD,
   type CartItem,
   type OrderEvent,
+  type OrderStatus,
   type ZoneId,
 } from '../data/mock'
 
-interface PlacedOrder {
+export interface PlacedOrder {
   id: string
   items: CartItem[]
   totalIqd: number
+  subtotalIqd: number
+  deliveryFeeIqd: number
   address: string
   note: string
   window: string
   payment: 'cod'
   timeline: OrderEvent[]
+  status: OrderStatus
   createdAt: string
+  createdDate: string
 }
 
 interface AppState {
   zoneId: ZoneId | null
   setZone: (id: ZoneId) => void
+  clearZone: () => void
   cart: CartItem[]
-  addToCart: (item: Omit<CartItem, 'qty'>, qty?: number) => void
-  updateQty: (id: string, qty: number) => void
+  addToCart: (item: Omit<CartItem, 'qty'> & { lineKey?: string }, qty?: number) => void
+  updateQty: (lineKey: string, qty: number) => void
   clearCart: () => void
   cartCount: number
   cartSubtotal: number
   deliveryFee: number
   cartTotal: number
+  freeDeliveryRemaining: number
+  orders: PlacedOrder[]
   order: PlacedOrder | null
   placeOrder: (input: {
     address: string
     note: string
     window: string
   }) => PlacedOrder
+  getOrder: (id: string) => PlacedOrder | undefined
+  toast: string | null
+  showToast: (msg: string) => void
+  dismissToast: () => void
 }
 
 const AppContext = createContext<AppState | null>(null)
 
 const ZONE_KEY = 'homefood-zone'
 const CART_KEY = 'homefood-cart'
+const ORDERS_KEY = 'homefood-orders'
 const ORDER_KEY = 'homefood-order'
 
 function readJson<T>(key: string, fallback: T): T {
@@ -62,21 +76,42 @@ function readJson<T>(key: string, fallback: T): T {
   }
 }
 
+function lineId(item: { id: string; lineKey?: string; meta?: string }) {
+  return item.lineKey ?? `${item.id}::${item.meta ?? ''}`
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [zoneId, setZoneId] = useState<ZoneId | null>(() => {
     const saved = localStorage.getItem(ZONE_KEY)
     return saved === 'karada' || saved === 'mansour' ? saved : null
   })
-  const [cart, setCart] = useState<CartItem[]>(() =>
-    readJson<CartItem[]>(CART_KEY, []),
-  )
-  const [order, setOrder] = useState<PlacedOrder | null>(() =>
-    readJson<PlacedOrder | null>(ORDER_KEY, null),
-  )
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    const items = readJson<CartItem[]>(CART_KEY, [])
+    return items.map((i) => ({ ...i, lineKey: lineId(i) }))
+  })
+  const [orders, setOrders] = useState<PlacedOrder[]>(() => {
+    const list = readJson<PlacedOrder[]>(ORDERS_KEY, [])
+    if (list.length) return list
+    const legacy = readJson<PlacedOrder | null>(ORDER_KEY, null)
+    return legacy ? [legacy] : []
+  })
+  const [toast, setToast] = useState<string | null>(null)
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg)
+    window.setTimeout(() => setToast(null), 2400)
+  }, [])
+
+  const dismissToast = useCallback(() => setToast(null), [])
 
   const setZone = useCallback((id: ZoneId) => {
     setZoneId(id)
     localStorage.setItem(ZONE_KEY, id)
+  }, [])
+
+  const clearZone = useCallback(() => {
+    setZoneId(null)
+    localStorage.removeItem(ZONE_KEY)
   }, [])
 
   const persistCart = useCallback((next: CartItem[]) => {
@@ -85,25 +120,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const addToCart = useCallback(
-    (item: Omit<CartItem, 'qty'>, qty = 1) => {
+    (item: Omit<CartItem, 'qty'> & { lineKey?: string }, qty = 1) => {
+      const key = lineId(item)
       setCart((prev) => {
-        const existing = prev.find((p) => p.id === item.id)
+        const existing = prev.find((p) => lineId(p) === key)
         const next = existing
           ? prev.map((p) =>
-              p.id === item.id ? { ...p, qty: p.qty + qty } : p,
+              lineId(p) === key ? { ...p, qty: p.qty + qty } : p,
             )
-          : [...prev, { ...item, qty }]
+          : [...prev, { ...item, qty, lineKey: key }]
         localStorage.setItem(CART_KEY, JSON.stringify(next))
         return next
       })
+      showToast('أُضيف إلى السلة')
     },
-    [],
+    [showToast],
   )
 
-  const updateQty = useCallback((id: string, qty: number) => {
+  const updateQty = useCallback((key: string, qty: number) => {
     setCart((prev) => {
       const next =
-        qty <= 0 ? prev.filter((p) => p.id !== id) : prev.map((p) => (p.id === id ? { ...p, qty } : p))
+        qty <= 0
+          ? prev.filter((p) => lineId(p) !== key)
+          : prev.map((p) => (lineId(p) === key ? { ...p, qty } : p))
       localStorage.setItem(CART_KEY, JSON.stringify(next))
       return next
     })
@@ -119,36 +158,63 @@ export function AppProvider({ children }: { children: ReactNode }) {
     () => cart.reduce((sum, i) => sum + i.priceIqd * i.qty, 0),
     [cart],
   )
-  const deliveryFee = cart.length ? DELIVERY_FEE_IQD : 0
+  const deliveryFee =
+    cart.length === 0
+      ? 0
+      : cartSubtotal >= FREE_DELIVERY_FROM_IQD
+        ? 0
+        : DELIVERY_FEE_IQD
   const cartTotal = cartSubtotal + deliveryFee
+  const freeDeliveryRemaining = Math.max(0, FREE_DELIVERY_FROM_IQD - cartSubtotal)
 
   const placeOrder = useCallback(
     (input: { address: string; note: string; window: string }) => {
+      const now = new Date()
       const placed: PlacedOrder = {
         id: `HF-${Math.floor(1000 + Math.random() * 9000)}`,
         items: cart,
         totalIqd: cartTotal,
+        subtotalIqd: cartSubtotal,
+        deliveryFeeIqd: deliveryFee,
         address: input.address,
         note: input.note,
         window: input.window,
         payment: 'cod',
-        timeline: buildOrderTimeline(),
-        createdAt: new Date().toLocaleTimeString('ar-IQ', {
+        status: 'preparing',
+        timeline: buildOrderTimeline(
+          now.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' }),
+          'preparing',
+        ),
+        createdAt: now.toLocaleTimeString('ar-IQ', {
           hour: '2-digit',
           minute: '2-digit',
         }),
+        createdDate: now.toLocaleDateString('ar-IQ'),
       }
-      setOrder(placed)
-      localStorage.setItem(ORDER_KEY, JSON.stringify(placed))
+      setOrders((prev) => {
+        const next = [placed, ...prev]
+        localStorage.setItem(ORDERS_KEY, JSON.stringify(next))
+        localStorage.setItem(ORDER_KEY, JSON.stringify(placed))
+        return next
+      })
       persistCart([])
+      showToast('تم تأكيد طلبك · نقد عند الاستلام')
       return placed
     },
-    [cart, cartTotal, persistCart],
+    [cart, cartTotal, cartSubtotal, deliveryFee, persistCart, showToast],
   )
+
+  const getOrder = useCallback(
+    (id: string) => orders.find((o) => o.id === id),
+    [orders],
+  )
+
+  const order = orders[0] ?? null
 
   const value: AppState = {
     zoneId,
     setZone,
+    clearZone,
     cart,
     addToCart,
     updateQty,
@@ -157,8 +223,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     cartSubtotal,
     deliveryFee,
     cartTotal,
+    freeDeliveryRemaining,
+    orders,
     order,
     placeOrder,
+    getOrder,
+    toast,
+    showToast,
+    dismissToast,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

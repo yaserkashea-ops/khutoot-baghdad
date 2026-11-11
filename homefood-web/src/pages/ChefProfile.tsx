@@ -7,6 +7,7 @@ import {
   mealsForChef,
   reviewsForChef,
 } from '../data/mock'
+import { EmptyState } from '../components/EmptyState'
 
 export function ChefProfile() {
   const { chefId } = useParams()
@@ -17,8 +18,7 @@ export function ChefProfile() {
   if (!chef) {
     return (
       <main className="page">
-        <p>الطاهي غير موجود.</p>
-        <Link to="/home">العودة</Link>
+        <EmptyState title="الطاهي غير موجود" body="تحقق من الرابط." actionTo="/search?tab=chefs" actionLabel="كل الطهاة" />
       </main>
     )
   }
@@ -45,7 +45,9 @@ export function ChefProfile() {
         <div className="brand-hero" style={{ fontSize: '2.2rem', marginBottom: '0.25rem' }}>
           {chef.kitchenName}
         </div>
-        <p style={{ opacity: 0.9 }}>{chef.name} · {chef.distanceKm} كم منك</p>
+        <p style={{ opacity: 0.9 }}>
+          {chef.name} · {chef.distanceKm} كم · {chef.yearsCooking} سنة خبرة
+        </p>
       </section>
 
       <div className="rating-line">
@@ -77,11 +79,13 @@ export function ChefProfile() {
           <div className="meal-grid" style={{ marginBottom: '1.4rem' }}>
             {meals.map((meal) => (
               <article key={meal.id} className="meal-item">
-                <div className="meal-visual" style={{ background: meal.accent }}>
+                <Link to={`/meal/${meal.id}`} className="meal-visual" style={{ background: meal.accent }}>
                   {meal.emoji}
-                </div>
+                </Link>
                 <div className="meal-body">
-                  <h3>{meal.name}</h3>
+                  <h3>
+                    <Link to={`/meal/${meal.id}`}>{meal.name}</Link>
+                  </h3>
                   <div className="desc">{meal.description}</div>
                   <div className="meal-foot">
                     <div>
@@ -123,38 +127,21 @@ export function ChefProfile() {
           </div>
           <div className="meal-grid" style={{ marginBottom: '1.4rem' }}>
             {frozen.map((item) => (
-              <article key={item.id} className="meal-item">
+              <Link key={item.id} to={`/frozen/${item.id}`} className="meal-item meal-link">
                 <div className="meal-visual" style={{ background: item.accent, fontSize: '1rem' }}>
                   مفرزن
                 </div>
                 <div className="meal-body">
                   <h3>{item.name}</h3>
-                  <span className={`state-tag ${item.state}`}>
-                    {item.stateLabel}
-                  </span>
+                  <span className={`state-tag ${item.state}`}>{item.stateLabel}</span>
                   <div className="meal-foot">
                     <div className="price">
                       {formatIqd(item.priceIqd)} / {item.unitLabel}
                     </div>
-                    <button
-                      type="button"
-                      className="btn btn-olive btn-sm"
-                      onClick={() =>
-                        addToCart({
-                          id: item.id,
-                          kind: 'frozen',
-                          name: item.name,
-                          chefName: chef.name,
-                          priceIqd: item.priceIqd,
-                          meta: item.unitLabel,
-                        })
-                      }
-                    >
-                      أضف
-                    </button>
+                    <span className="linkish">تفاصيل</span>
                   </div>
                 </div>
-              </article>
+              </Link>
             ))}
           </div>
         </>

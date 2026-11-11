@@ -2,15 +2,24 @@ import { useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { FROZEN, FROZEN_CATEGORIES, chefById, formatIqd } from '../data/mock'
+import { SearchField } from '../components/SearchField'
+import { EmptyState } from '../components/EmptyState'
 
 export function FrozenStore() {
-  const { zoneId, addToCart } = useApp()
+  const { zoneId } = useApp()
   const [cat, setCat] = useState<(typeof FROZEN_CATEGORIES)[number]>('الكل')
+  const [q, setQ] = useState('')
+  const [stateFilter, setStateFilter] = useState<'all' | 'frozen' | 'chilled'>('all')
 
-  const items = useMemo(
-    () => (cat === 'الكل' ? FROZEN : FROZEN.filter((p) => p.category === cat)),
-    [cat],
-  )
+  const items = useMemo(() => {
+    return FROZEN.filter((p) => {
+      if (cat !== 'الكل' && p.category !== cat) return false
+      if (stateFilter !== 'all' && p.state !== stateFilter) return false
+      if (!q.trim()) return true
+      const chef = chefById(p.chefId)
+      return `${p.name} ${p.category} ${chef?.name ?? ''}`.includes(q.trim())
+    })
+  }, [cat, q, stateFilter])
 
   if (!zoneId) return <Navigate to="/" replace />
 
@@ -19,16 +28,16 @@ export function FrozenStore() {
       <div className="section-head">
         <div>
           <h2>متجر المفرزنات</h2>
-          <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-            قطعة أو وزن — مجمّد للقلي أو مبرد للفرن/للتقديم
-          </p>
+          <p className="subtle">قطعة أو وزن — مجمّد للقلي أو مبرد للفرن/للتقديم</p>
         </div>
         <Link to="/menu" className="linkish">
           قائمة اليوم
         </Link>
       </div>
 
-      <div className="cat-scroll anim-fade">
+      <SearchField value={q} onChange={setQ} placeholder="ابحث في المفرزنات…" />
+
+      <div className="cat-scroll" style={{ marginTop: '0.75rem' }}>
         {FROZEN_CATEGORIES.map((c) => (
           <button
             key={c}
@@ -41,59 +50,60 @@ export function FrozenStore() {
         ))}
       </div>
 
-      <div className="meal-grid anim-rise">
-        {items.map((item) => {
-          const chef = chefById(item.chefId)
-          return (
-            <article key={item.id} className="meal-item">
-              <div
-                className="meal-visual"
-                style={{
-                  background: `linear-gradient(160deg, ${item.accent}, #1c2418)`,
-                  fontSize: '0.95rem',
-                  fontWeight: 700,
-                }}
-              >
-                {item.category}
-              </div>
-              <div className="meal-body">
-                <h3>{item.name}</h3>
-                <div className="chef">
-                  <Link to={`/chef/${item.chefId}`}>{chef?.kitchenName}</Link>
-                </div>
-                <span className={`state-tag ${item.state}`}>
-                  {item.stateLabel}
-                </span>
-                <div className="meal-foot">
-                  <div className="price">
-                    {formatIqd(item.priceIqd)}
-                    <span style={{ fontWeight: 500, color: 'var(--muted)', fontSize: '0.8rem' }}>
-                      {' '}
-                      / {item.unitLabel}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-olive btn-sm"
-                    onClick={() =>
-                      addToCart({
-                        id: item.id,
-                        kind: 'frozen',
-                        name: item.name,
-                        chefName: chef?.name ?? '',
-                        priceIqd: item.priceIqd,
-                        meta: `${item.unitLabel} · ${item.state === 'frozen' ? 'مجمّد' : 'مبرد'}`,
-                      })
-                    }
-                  >
-                    أضف
-                  </button>
-                </div>
-              </div>
-            </article>
-          )
-        })}
+      <div className="cat-scroll">
+        {(
+          [
+            ['all', 'الكل'],
+            ['frozen', 'مجمّد'],
+            ['chilled', 'مبرد'],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={`cat-chip ${stateFilter === id ? 'active' : ''}`}
+            onClick={() => setStateFilter(id)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
+
+      {items.length === 0 ? (
+        <EmptyState title="لا منتجات" body="لا نتائج لهذه التصفية." actionTo="/frozen" actionLabel="إعادة الضبط" />
+      ) : (
+        <div className="meal-grid anim-rise">
+          {items.map((item) => {
+            const chef = chefById(item.chefId)
+            return (
+              <Link key={item.id} to={`/frozen/${item.id}`} className="meal-item meal-link">
+                <div
+                  className="meal-visual"
+                  style={{
+                    background: `linear-gradient(160deg, ${item.accent}, #1c2418)`,
+                    fontSize: '0.95rem',
+                    fontWeight: 700,
+                  }}
+                >
+                  {item.category}
+                </div>
+                <div className="meal-body">
+                  <h3>{item.name}</h3>
+                  <div className="chef">{chef?.kitchenName}</div>
+                  <span className={`state-tag ${item.state}`}>{item.stateLabel}</span>
+                  <div className="meal-foot">
+                    <div className="price">
+                      {formatIqd(item.priceIqd)}
+                      <span className="unit-hint"> / {item.unitLabel}</span>
+                    </div>
+                    <span className="linkish">تفاصيل</span>
+                  </div>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      )}
     </main>
   )
 }

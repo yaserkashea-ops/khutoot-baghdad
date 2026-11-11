@@ -1,64 +1,69 @@
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { formatIqd } from '../data/mock'
+import { EmptyState } from '../components/EmptyState'
 
 export function OrderStatus() {
-  const { zoneId, order } = useApp()
+  const { orderId } = useParams()
+  const { zoneId, order, getOrder } = useApp()
   if (!zoneId) return <Navigate to="/" replace />
 
-  if (!order) {
+  const current = orderId ? getOrder(orderId) : order
+
+  if (!current) {
     return (
       <main className="page">
-        <div className="empty anim-rise">
-          <h2>لا يوجد طلب حالياً</h2>
-          <p>بعد إتمام الدفع التجريبي ستظهر هنا حالات الطلب النصية.</p>
-          <Link to="/home" className="btn btn-primary" style={{ marginTop: '1rem' }}>
-            ابدأ التسوق
-          </Link>
-        </div>
+        <EmptyState
+          title="الطلب غير موجود"
+          body="لا يوجد طلب بهذا الرقم على هذا الجهاز."
+          actionTo="/orders"
+          actionLabel="طلباتي"
+        />
       </main>
     )
   }
 
-  const currentIndex = order.timeline.findIndex((e) => !e.done)
+  const currentIndex = current.timeline.findIndex((e) => !e.done)
 
   return (
     <main className="page">
+      <Link to="/orders" className="back-link">
+        → كل الطلبات
+      </Link>
+
       <div className="section-head">
         <div>
           <h2>حالة الطلب</h2>
-          <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-            تتبع نصّي بدون خريطة حية (مرحلة لاحقة)
-          </p>
+          <p className="subtle">تتبع نصّي بدون خريطة حية (مرحلة لاحقة)</p>
         </div>
       </div>
 
       <div className="order-card anim-fade">
-        <div className="id">{order.id}</div>
-        <div style={{ color: 'var(--muted)', marginTop: '0.35rem', fontSize: '0.9rem' }}>
-          طُلب الساعة {order.createdAt} · نافذة {order.window}
+        <div className="id">{current.id}</div>
+        <div className="meta">
+          {current.createdDate} · {current.createdAt} · نافذة {current.window}
         </div>
         <div className="price" style={{ marginTop: '0.55rem' }}>
-          {formatIqd(order.totalIqd)} · نقد عند الاستلام
+          {formatIqd(current.totalIqd)} · نقد عند الاستلام
         </div>
-        <div style={{ marginTop: '0.55rem', fontSize: '0.9rem', color: 'var(--muted)' }}>
-          {order.address}
+        <div className="meta" style={{ marginTop: '0.55rem' }}>
+          {current.address}
         </div>
-        {order.note && (
-          <div style={{ marginTop: '0.35rem', fontSize: '0.88rem' }}>ملاحظة: {order.note}</div>
+        {current.note && (
+          <div style={{ marginTop: '0.35rem', fontSize: '0.88rem' }}>ملاحظة: {current.note}</div>
         )}
       </div>
 
       <div className="order-card">
         <h3 style={{ marginBottom: '1rem', fontSize: '1.05rem' }}>مسار الحالة</h3>
         <ul className="timeline">
-          {order.timeline.map((event, index) => {
-            const isCurrent = index === (currentIndex === -1 ? order.timeline.length - 1 : currentIndex)
-            const done = event.done || (currentIndex === -1 && index < order.timeline.length)
+          {current.timeline.map((event, index) => {
+            const isCurrent =
+              index === (currentIndex === -1 ? current.timeline.length - 1 : currentIndex)
             return (
               <li
                 key={event.status}
-                className={`${done ? 'done' : ''} ${isCurrent && !event.done ? 'current' : ''}`}
+                className={`${event.done ? 'done' : ''} ${isCurrent && !event.done ? 'current' : ''}`}
               >
                 <div className="dot" />
                 <div>
@@ -80,13 +85,16 @@ export function OrderStatus() {
         <h2>محتويات الطلب</h2>
       </div>
       <div className="cart-list">
-        {order.items.map((item) => (
-          <div key={item.id} className="cart-row">
+        {current.items.map((item, idx) => (
+          <div key={`${item.id}-${idx}`} className="cart-row">
             <div>
               <h3>
                 {item.name} × {item.qty}
               </h3>
-              <div className="meta">{item.chefName}</div>
+              <div className="meta">
+                {item.chefName}
+                {item.meta ? ` · ${item.meta}` : ''}
+              </div>
             </div>
             <div className="price">{formatIqd(item.priceIqd * item.qty)}</div>
           </div>

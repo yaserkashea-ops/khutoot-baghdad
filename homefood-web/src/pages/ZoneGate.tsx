@@ -55,7 +55,7 @@ export function ZoneGate() {
             </button>
           ))}
         </div>
-        <p className="sample-tag">معاينة واجهة — بيانات تجريبية بدون دفع حقيقي</p>
+        <p className="sample-tag">معاينة متقدمة للزبون — بيانات تجريبية · نقد عند الاستلام فقط</p>
       </section>
     </div>
   )

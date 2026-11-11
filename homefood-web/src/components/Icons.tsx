@@ -49,3 +49,12 @@ export function IconPin() {
     </svg>
   )
 }
+
+export function IconSearch() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16.5 16.5 20 20" strokeLinecap="round" />
+    </svg>
+  )
+}

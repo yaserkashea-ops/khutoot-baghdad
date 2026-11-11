@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext'
 import { IconCart, IconFrozen, IconHome, IconOrder, IconPin } from './Icons'
 
 export function Layout() {
-  const { zoneId, cartCount } = useApp()
+  const { zoneId, cartCount, toast, dismissToast, clearZone } = useApp()
   const location = useLocation()
   const hideNav =
     location.pathname === '/' ||
@@ -22,10 +22,13 @@ export function Layout() {
             </div>
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-            <span className="zone-chip">
+            <button type="button" className="zone-chip" onClick={clearZone} title="تغيير المنطقة">
               <IconPin />
               الكرادة
-            </span>
+            </button>
+            <Link to="/orders" className="icon-btn" aria-label="طلباتي">
+              <IconOrder />
+            </Link>
             <Link to="/cart" className="icon-btn" aria-label="السلة">
               <IconCart />
               {cartCount > 0 && <span className="badge">{cartCount}</span>}
@@ -36,6 +39,12 @@ export function Layout() {
 
       <Outlet />
 
+      {toast && (
+        <button type="button" className="toast" onClick={dismissToast}>
+          {toast}
+        </button>
+      )}
+
       {!hideNav && (
         <nav className="bottom-nav" aria-label="التنقل الرئيسي">
           <NavLink to="/home" className={({ isActive }) => (isActive ? 'active' : '')}>
@@ -44,15 +53,15 @@ export function Layout() {
           </NavLink>
           <NavLink to="/menu" className={({ isActive }) => (isActive ? 'active' : '')}>
             <IconOrder />
-            قائمة اليوم
+            القائمة
           </NavLink>
           <NavLink to="/frozen" className={({ isActive }) => (isActive ? 'active' : '')}>
             <IconFrozen />
             مفرزنات
           </NavLink>
-          <NavLink to="/cart" className={({ isActive }) => (isActive ? 'active' : '')}>
+          <NavLink to="/orders" className={({ isActive }) => (isActive ? 'active' : '')}>
             <IconCart />
-            السلة
+            طلباتي
           </NavLink>
         </nav>
       )}
