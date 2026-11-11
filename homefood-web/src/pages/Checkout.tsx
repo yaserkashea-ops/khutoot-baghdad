@@ -8,6 +8,7 @@ export function Checkout() {
     zoneId,
     cart,
     cartTotal,
+    order,
     placeOrder,
   } = useApp()
   const navigate = useNavigate()
@@ -15,18 +16,23 @@ export function Checkout() {
   const [phone, setPhone] = useState('07xx xxx xxxx')
   const [windowLabel, setWindowLabel] = useState('١٢:٠٠ – ٢:٠٠')
   const [note, setNote] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   if (!zoneId) return <Navigate to="/" replace />
-  if (cart.length === 0) return <Navigate to="/cart" replace />
+  // After placeOrder clears the cart, prefer the order page over bouncing to /cart.
+  if (cart.length === 0 && !submitting) {
+    return <Navigate to={order ? '/order' : '/cart'} replace />
+  }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault()
+    setSubmitting(true)
     placeOrder({
       address: `${address} · ${phone}`,
       note,
       window: windowLabel,
     })
-    navigate('/order')
+    navigate('/order', { replace: true })
   }
 
   return (

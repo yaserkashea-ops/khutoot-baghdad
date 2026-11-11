@@ -49,40 +49,67 @@ interface AppState {
 const AppContext = createContext<AppState | null>(null)
 
 const ZONE_KEY = 'homefood-zone'
+const CART_KEY = 'homefood-cart'
+const ORDER_KEY = 'homefood-order'
+
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return fallback
+    return JSON.parse(raw) as T
+  } catch {
+    return fallback
+  }
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [zoneId, setZoneId] = useState<ZoneId | null>(() => {
     const saved = localStorage.getItem(ZONE_KEY)
     return saved === 'karada' || saved === 'mansour' ? saved : null
   })
-  const [cart, setCart] = useState<CartItem[]>([])
-  const [order, setOrder] = useState<PlacedOrder | null>(null)
+  const [cart, setCart] = useState<CartItem[]>(() =>
+    readJson<CartItem[]>(CART_KEY, []),
+  )
+  const [order, setOrder] = useState<PlacedOrder | null>(() =>
+    readJson<PlacedOrder | null>(ORDER_KEY, null),
+  )
 
   const setZone = useCallback((id: ZoneId) => {
     setZoneId(id)
     localStorage.setItem(ZONE_KEY, id)
   }, [])
 
-  const addToCart = useCallback((item: Omit<CartItem, 'qty'>, qty = 1) => {
-    setCart((prev) => {
-      const existing = prev.find((p) => p.id === item.id)
-      if (existing) {
-        return prev.map((p) =>
-          p.id === item.id ? { ...p, qty: p.qty + qty } : p,
-        )
-      }
-      return [...prev, { ...item, qty }]
-    })
+  const persistCart = useCallback((next: CartItem[]) => {
+    setCart(next)
+    localStorage.setItem(CART_KEY, JSON.stringify(next))
   }, [])
+
+  const addToCart = useCallback(
+    (item: Omit<CartItem, 'qty'>, qty = 1) => {
+      setCart((prev) => {
+        const existing = prev.find((p) => p.id === item.id)
+        const next = existing
+          ? prev.map((p) =>
+              p.id === item.id ? { ...p, qty: p.qty + qty } : p,
+            )
+          : [...prev, { ...item, qty }]
+        localStorage.setItem(CART_KEY, JSON.stringify(next))
+        return next
+      })
+    },
+    [],
+  )
 
   const updateQty = useCallback((id: string, qty: number) => {
     setCart((prev) => {
-      if (qty <= 0) return prev.filter((p) => p.id !== id)
-      return prev.map((p) => (p.id === id ? { ...p, qty } : p))
+      const next =
+        qty <= 0 ? prev.filter((p) => p.id !== id) : prev.map((p) => (p.id === id ? { ...p, qty } : p))
+      localStorage.setItem(CART_KEY, JSON.stringify(next))
+      return next
     })
   }, [])
 
-  const clearCart = useCallback(() => setCart([]), [])
+  const clearCart = useCallback(() => persistCart([]), [persistCart])
 
   const cartCount = useMemo(
     () => cart.reduce((sum, i) => sum + i.qty, 0),
@@ -112,10 +139,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }),
       }
       setOrder(placed)
-      setCart([])
+      localStorage.setItem(ORDER_KEY, JSON.stringify(placed))
+      persistCart([])
       return placed
     },
-    [cart, cartTotal],
+    [cart, cartTotal, persistCart],
   )
 
   const value: AppState = {
