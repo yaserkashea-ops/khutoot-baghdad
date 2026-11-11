@@ -45,6 +45,8 @@ export interface FrozenProduct {
   unit: UnitType
   unitLabel: string
   state: FrozenState
+  /** Arabic label shown on the product (فrying / oven / serving). */
+  stateLabel: string
   accent: string
 }
 
@@ -229,6 +231,7 @@ export const FROZEN: FrozenProduct[] = [
     unit: 'weight',
     unitLabel: 'كيلو',
     state: 'frozen',
+    stateLabel: 'مجمّد جاهز للقلي',
     accent: '#3d6b6b',
   },
   {
@@ -240,6 +243,7 @@ export const FROZEN: FrozenProduct[] = [
     unit: 'weight',
     unitLabel: 'نصف كيلو',
     state: 'frozen',
+    stateLabel: 'مجمّد جاهز للقلي',
     accent: '#2f5a5a',
   },
   {
@@ -251,6 +255,7 @@ export const FROZEN: FrozenProduct[] = [
     unit: 'piece',
     unitLabel: 'قطعة',
     state: 'frozen',
+    stateLabel: 'مجمّد جاهز للقلي',
     accent: '#4a6b3d',
   },
   {
@@ -262,6 +267,7 @@ export const FROZEN: FrozenProduct[] = [
     unit: 'weight',
     unitLabel: 'صينية صغيرة',
     state: 'chilled',
+    stateLabel: 'مبرد جاهز للفرن',
     accent: '#6b5a3d',
   },
   {
@@ -273,6 +279,7 @@ export const FROZEN: FrozenProduct[] = [
     unit: 'piece',
     unitLabel: 'قطعة',
     state: 'chilled',
+    stateLabel: 'مبرد جاهز للفرن',
     accent: '#5a6b4a',
   },
   {
@@ -284,6 +291,7 @@ export const FROZEN: FrozenProduct[] = [
     unit: 'piece',
     unitLabel: 'علبة',
     state: 'chilled',
+    stateLabel: 'مبرد جاهز للتقديم',
     accent: '#6b7c3a',
   },
 ]

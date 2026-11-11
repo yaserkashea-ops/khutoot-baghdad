@@ -130,7 +130,7 @@ export function ChefProfile() {
                 <div className="meal-body">
                   <h3>{item.name}</h3>
                   <span className={`state-tag ${item.state}`}>
-                    {item.state === 'frozen' ? 'مجمّد للقلي' : 'مبرد للفرن'}
+                    {item.stateLabel}
                   </span>
                   <div className="meal-foot">
                     <div className="price">

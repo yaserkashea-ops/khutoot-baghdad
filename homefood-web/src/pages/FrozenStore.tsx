@@ -20,7 +20,7 @@ export function FrozenStore() {
         <div>
           <h2>متجر المفرزنات</h2>
           <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-            قطعة أو وزن — مجمّد للقلي أو مبرد للفرن
+            قطعة أو وزن — مجمّد للقلي أو مبرد للفرن/للتقديم
           </p>
         </div>
         <Link to="/menu" className="linkish">
@@ -62,7 +62,7 @@ export function FrozenStore() {
                   <Link to={`/chef/${item.chefId}`}>{chef?.kitchenName}</Link>
                 </div>
                 <span className={`state-tag ${item.state}`}>
-                  {item.state === 'frozen' ? 'مجمّد جاهز للقلي' : 'مبرد جاهز للفرن'}
+                  {item.stateLabel}
                 </span>
                 <div className="meal-foot">
                   <div className="price">
