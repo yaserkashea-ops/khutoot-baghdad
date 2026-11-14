@@ -54,3 +54,7 @@ firebase-debug.log
 # Android sideload APK hosted separately (copied at deploy time)
 /hosting/android/*.apk
 
+# HomeFood web preview (Vite)
+/homefood-web/node_modules/
+/homefood-web/dist/
+
