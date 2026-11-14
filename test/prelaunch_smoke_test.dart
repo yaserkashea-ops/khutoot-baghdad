@@ -6,7 +6,6 @@ import 'package:masarat/core/import/listing_text_parser.dart';
 import 'package:masarat/data/listings_repository.dart';
 import 'package:masarat/features/admin/admin_gate_page.dart';
 import 'package:masarat/features/admin/admin_shell_page.dart';
-import 'package:masarat/features/admin/pages/admin_import_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -68,22 +67,6 @@ void main() {
 
     expect(find.byType(AdminShellPage), findsNothing);
     expect(find.textContaining('أدخل'), findsWidgets);
-  });
-
-  testWidgets('admin import page parses sample paste', (tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(body: AdminImportPage()),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('مثال'));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('المسودات'), findsOneWidget);
-    expect(find.textContaining('الجادرية'), findsWidgets);
-    expect(find.text('نشر المحدد (3)'), findsOneWidget);
   });
 
   test('import then listings feed grows', () async {

@@ -12,7 +12,6 @@ import '../../core/theme/theme_toggle_button.dart';
 import 'admin_gate_page.dart';
 import 'pages/admin_dashboard_page.dart';
 import 'pages/admin_duplicates_page.dart';
-import 'pages/admin_import_page.dart';
 import 'pages/admin_invites_page.dart';
 import 'pages/admin_listings_page.dart';
 import 'pages/admin_places_page.dart';
@@ -40,7 +39,6 @@ class _AdminShellPageState extends State<AdminShellPage> {
     'الإعلانات',
     'جهات المنشورات',
     'المكرر',
-    'استيراد',
     'دعوات',
     'البلاغات',
     'المناطق',
@@ -148,18 +146,11 @@ class _AdminShellPageState extends State<AdminShellPage> {
                       selected: _index == 5,
                     ),
                     _MoreItem(
-                      icon: Icons.upload_file_outlined,
-                      title: 'استيراد',
-                      subtitle: 'لصق منشورات أو أوامر صوتية',
-                      pageIndex: 6,
-                      selected: _index == 6,
-                    ),
-                    _MoreItem(
                       icon: Icons.campaign_outlined,
                       title: 'دعوات',
                       subtitle: 'استخراج أرقام ودعوة يدوية',
-                      pageIndex: 7,
-                      selected: _index == 7,
+                      pageIndex: 6,
+                      selected: _index == 6,
                     ),
                   ],
                 ),
@@ -171,22 +162,22 @@ class _AdminShellPageState extends State<AdminShellPage> {
                       icon: Icons.support_agent_outlined,
                       title: 'البلاغات',
                       subtitle: 'بلاغ / شكوى / مشكلة',
-                      pageIndex: 8,
-                      selected: _index == 8,
+                      pageIndex: 7,
+                      selected: _index == 7,
                     ),
                     _MoreItem(
                       icon: Icons.place_outlined,
                       title: 'المناطق',
                       subtitle: 'قوائم مناطق الفلاتر',
-                      pageIndex: 9,
-                      selected: _index == 9,
+                      pageIndex: 8,
+                      selected: _index == 8,
                     ),
                     _MoreItem(
                       icon: Icons.settings_outlined,
                       title: 'الإعدادات',
                       subtitle: 'تواصل الإدارة والحساب',
-                      pageIndex: 10,
-                      selected: _index == 10,
+                      pageIndex: 9,
+                      selected: _index == 9,
                     ),
                   ],
                 ),
@@ -222,10 +213,9 @@ class _AdminShellPageState extends State<AdminShellPage> {
       3 => const AdminListingsPage(),
       4 => const AdminPublishedContactsPage(),
       5 => const AdminDuplicatesPage(),
-      6 => const AdminImportPage(),
-      7 => const AdminInvitesPage(),
-      8 => const AdminReportsPage(),
-      9 => const AdminPlacesPage(),
+      6 => const AdminInvitesPage(),
+      7 => const AdminReportsPage(),
+      8 => const AdminPlacesPage(),
       _ => const AdminSettingsPage(),
     };
 
