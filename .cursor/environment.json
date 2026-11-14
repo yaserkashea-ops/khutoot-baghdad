@@ -1,0 +1,17 @@
+{
+  "name": "khutoot-baghdad (Flutter web)",
+  "install": "bash tool/cloud_agent_setup.sh",
+  "terminals": [
+    {
+      "name": "flutter-web",
+      "command": "flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080",
+      "description": "Flutter web dev server for the public app, served at http://localhost:8080 (hot restart with 'R')."
+    }
+  ],
+  "ports": [
+    {
+      "name": "flutter-web",
+      "port": 8080
+    }
+  ]
+}
